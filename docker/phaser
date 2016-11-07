@@ -1,0 +1,4 @@
+#!/bin/bash
+# Wrapper script for phASER that first activates an environment and then runs phaser in it
+source activate phaser
+exec python /opt/phaser/phaser.py "$@"
