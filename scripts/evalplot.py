@@ -93,7 +93,7 @@ def plot(fig, table, yfunc, yaxislabel, loc=0, yscale=None, ylim=None, cc=False)
 		ax.legend(loc=loc)
 
 		ax.set_xticks([2, 3, 4, 5, 10, 15, 20])
-		ax.set_xticklabels(['2', '3', '4', '5', '10', '15', 'all'])
+		ax.set_xticklabels(['2', '3', '4', '5', '10', '15', '60'])
 		ax.set_xlabel('Coverage')
 		ax.set_xlim(1, 21)
 
