@@ -568,9 +568,10 @@ rule whatshap_noindels:  # with re-alignment
 		ref=reference,
 		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
 		vcf='vcf/{dataset,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.unphased.vcf'
-	output: 'phased/whatshap/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf'
-	log: 'phased/whatshap/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
-	shell: '{time} {whatshap} phase --reference {input.ref} {input.vcf} {input.bam} > {output} 2> {log}'
+	output:
+		vcf='phased/whatshap/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf',
+		log='phased/whatshap/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
+	shell: '{time} {whatshap} phase --reference {input.ref} {input.vcf} {input.bam} > {output.vcf} 2> {output.log}'
 
 
 rule whatshap_indels:  # with re-alignment
@@ -578,9 +579,10 @@ rule whatshap_indels:  # with re-alignment
 		ref=reference,
 		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
 		vcf='vcf/{dataset,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.unphased.vcf'
-	output: 'phased/whatshap/indels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf'
-	log: 'phased/whatshap/indels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
-	shell: '{time} {whatshap} phase --indels --reference {input.ref} {input.vcf} {input.bam} > {output} 2> {log}'
+	output:
+		vcf='phased/whatshap/indels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf',
+		log='phased/whatshap/indels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
+	shell: '{time} {whatshap} phase --indels --reference {input.ref} {input.vcf} {input.bam} > {output.vcf} 2> {output.log}'
 
 
 ## Evaluation: compare phasing results to ground truth, get VCF statistics
@@ -609,6 +611,32 @@ rule whatshap_stats:
 		'{whatshap} stats --tsv {output.stats} {input.vcf} &> {log}'
 
 
+rule connected_components:
+	# Extract the number of connected components from WhatsHap log output
+	output:
+		components='eval/components/{indelsornot,(indels|noindels)}/' + dataset_pattern + '.cov{coverage}.components'
+	input:
+		whatshap_log='phased/whatshap/{indelsornot}/' + dataset_pattern + '.cov{coverage}.log'
+	run:
+		r = re.compile(r'Best-case phasing would result in [0-9]+ non-singleton phased blocks \((?P<blocks>[0-9]+) in total\).*')
+		with open(input.whatshap_log) as f:
+			components = None
+			for line in f:
+				m = r.match(line)
+				if m:
+					components = int(m.group('blocks'))
+					# no break - we want the last occurrence
+			if components is None:
+				sys.exit("WhatsHap log file missing line with 'Best-case phasing would result ...'")
+		with open(output.components, 'w') as f:
+			print('dataset', 'individual', 'indels', 'coverage', 'components', sep='\t', file=f)
+			indels = int(wildcards.indelsornot == 'indels')
+			print(wildcards.dataset, wildcards.individual, indels, wildcards.coverage, components, sep='\t', file=f)
+
+
+
+## Create two tables with evaluation results
+
 def all_eval_paths(extension):
 	l1 = expand('eval/{program}/{dataset}.pacbio.{individual}.chr1.cov{coverage}' + extension ,
 		program=['hapcut/indels', 'hapcut/noindels', 'read-backed-phasing/noindels',
@@ -620,8 +648,6 @@ def all_eval_paths(extension):
 	l2 = tuple(s for s in l2 if not ('/ashk.' in s and '.covall.' in s))
 	return l1 + l2
 
-
-## Create one table with evaluation results
 
 rule evaluation_summary:
 	input:
@@ -640,12 +666,31 @@ rule evaluation_summary:
 		"""
 
 
+rule summarize_connected_components:
+	output:
+		summary='eval/summary.components'
+	input:
+		components=expand('eval/components/{indels}/{dataset}.pacbio.{individual}.chr1.cov{coverage}.components',
+			indels=['indels', 'noindels'], dataset=datasets, individual=individuals, coverage=coverage)
+	shell:
+		"""
+		(
+			head -n1 {input.components[0]}
+			for f in $(sorted {input.components}); do
+				sed 1d $f
+			done
+		) > {output}
+		"""
+
+
 rule plot_eval:
 	output:
 		pdf='eval/{type}.pdf'
-	input: 'eval/summary.eval'
+	input:
+		eval='eval/summary.eval',
+		components='eval/summary.components'
 	run:
-		shell("{eval_plot} --type={wildcards.type} {input} {output.pdf}")
+		shell("{eval_plot} --type={wildcards.type} {input.eval} {input.components} {output.pdf}")
 
 
 ## General rules
