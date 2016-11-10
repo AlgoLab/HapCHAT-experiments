@@ -426,7 +426,7 @@ rule bwa_mem_single_end_pacbio:
 		indexed=reference + '.bwt'
 	output: 'sim/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.haplotype{hap,[12]}.bam'
 	log: 'sim/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.haplotype{hap,[12]}.bam.log'
-	threads: 8
+	threads: 16
 	run:
 		sample = role_to_sampleid[wildcards.individual]
 		shell('{time} bwa mem -x pacbio -t {threads} {input.ref} {input.fastq} | samtools view -u - | picard AddOrReplaceReadGroups {picard_tmpdir_switch} VALIDATION_STRINGENCY=LENIENT I=/dev/stdin O={output} ID={wildcards.individual}{wildcards.hap} LB=UNKNOWN PL=PACBIO PU=UNKNOWN SM={sample} 2> {log}')
