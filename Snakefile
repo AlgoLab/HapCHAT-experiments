@@ -546,7 +546,7 @@ rule phaser:
 		bai='bam/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.bai',
 		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
 	log:
-		'phaser/{indelsornot}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
+		'phased/phaser/{indelsornot}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
 	run:
 		extra = ' --include_indels 1' if wildcards.indelsornot == 'indels' else ' --include_indels 0'
 		sample = role_to_sampleid[wildcards.individual]
