@@ -615,7 +615,9 @@ def all_eval_paths(extension):
 			'whatshap-norealign/noindels', 'whatshap/noindels', 'whatshap/indels', 'whatshap/trio'],
 		dataset=datasets, individual=individuals, coverage=coverage),
 	l2 = expand('eval/phaser/{indels}/{dataset}.pacbio.{individual}.chr1.cov{coverage}' + extension,
-		indels=['indels', 'noindels'], dataset=datasets, individual=individuals, coverage=[c for c in coverage if c != 'all']),
+		indels=['indels', 'noindels'], dataset=datasets, individual=individuals, coverage=coverage)
+	# Exclude because they did not finish within 24h
+	l2 = tuple(s for s in l2 if not ('/ashk.' in s and '.covall.' in s))
 	return l1 + l2
 
 
