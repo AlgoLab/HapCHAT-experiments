@@ -630,7 +630,7 @@ rule evaluation_summary:
 		"""
 		(
 			paste {input.evals[0]} {input.stats[0]} | head -n1
-			for e in {input.evals}; do
+			for e in $(sort {input.evals}); do
 				s=${{e%%.eval}}.stats
 				paste $e $s | sed 1d
 			done
