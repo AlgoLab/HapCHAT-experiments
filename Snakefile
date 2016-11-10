@@ -558,22 +558,22 @@ rule whatshap_norealign:
 	input:
 		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
 		vcf='vcf/{dataset,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.unphased.vcf'
-	output: 'phased/whatshap/classic/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf'
-	log: 'phased/whatshap/classic/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
+	output: 'phased/whatshap-norealign/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf'
+	log: 'phased/whatshap-norealign/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
 	shell: '{time} {whatshap} phase {input.vcf} {input.bam} > {output} 2> {log}'
 
 
-rule whatshap_noindels:
+rule whatshap_noindels:  # with re-alignment
 	input:
 		ref=reference,
 		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
 		vcf='vcf/{dataset,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.unphased.vcf'
-	output: 'phased/whatshap/realign/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf'
-	log: 'phased/whatshap/realign/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
+	output: 'phased/whatshap/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf'
+	log: 'phased/whatshap/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
 	shell: '{time} {whatshap} phase --reference {input.ref} {input.vcf} {input.bam} > {output} 2> {log}'
 
 
-rule whatshap_indels:
+rule whatshap_indels:  # with re-alignment
 	input:
 		ref=reference,
 		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
@@ -591,7 +591,7 @@ rule evaluate_phasing_tool:
 		truth='vcf/{dataset}.{individual}.chr{chromosome}.phased.vcf',
 		phased='phased/{program}/' + dataset_pattern + '.cov{coverage}.vcf'
 	output:
-		'eval/{program,(whatshap/classic|whatshap/trio|whatshap/realign|whatshap/indels|read-backed-phasing/noindels|hapcut/indels|hapcut/noindels|phaser/indels|phaser/noindels)}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.eval'
+		'eval/{program,(whatshap-norealign/noindels|whatshap/trio|whatshap/noindels|whatshap/indels|read-backed-phasing/noindels|hapcut/indels|hapcut/noindels|phaser/indels|phaser/noindels)}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.eval'
 	log:
 		'eval/{program}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
 	shell:
@@ -612,7 +612,7 @@ rule whatshap_stats:
 def all_eval_paths(extension):
 	l1 = expand('eval/{program}/{dataset}.pacbio.{individual}.chr1.cov{coverage}' + extension ,
 		program=['hapcut/indels', 'hapcut/noindels', 'read-backed-phasing/noindels',
-			'whatshap/classic', 'whatshap/realign', 'whatshap/indels', 'whatshap/trio'],
+			'whatshap-norealign/noindels', 'whatshap/noindels', 'whatshap/indels', 'whatshap/trio'],
 		dataset=datasets, individual=individuals, coverage=coverage),
 	l2 = expand('eval/phaser/{indels}/{dataset}.pacbio.{individual}.chr1.cov{coverage}' + extension,
 		indels=['indels', 'noindels'], dataset=datasets, individual=individuals, coverage=[c for c in coverage if c != 'all']),
