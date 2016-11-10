@@ -46,7 +46,7 @@ whatshap = 'whatshap'
 # Software that must be installed manually prior to running
 # the Snakefile due to licensing restrictions
 shapeit = 'restricted-software/shapeit'
-gatk = 'gatk'
+gatk_jar = 'restricted-software/GenomeAnalysisTK.jar'
 
 # hapcompass is unused
 hapcompass = 'java -Xmx220g -jar .../hapcompass-0.8.1.jar'
@@ -86,7 +86,7 @@ rule shapeit_missing:
 
 
 rule gatk_missing:
-	output: 'restricted-software/GenomeAnalysisTK.jar'
+	output: gatk_jar
 	shell:
 		"""
 		echo
@@ -95,23 +95,12 @@ rule gatk_missing:
 		echo
 		echo "Choose one of the following options:"
 		echo
-		echo " - If you do not run this pipeline from the Docker image and you"
-		echo "   are sure that running 'gatk' from the command-line works,"
-		echo "   then run 'touch restricted-software/gatk-was-registered' and "
-		echo "   re-run snakemake."
-		echo
 		echo " - If you run from the Docker image, then download GATK 3.5,"
-		echo "   unpack it, place the jar file at 'restricted-software/GenomeAnalysisTK.jar'"
+		echo "   unpack it, place the jar file at '{output}'"
 		echo "   and then re-run snakemake."
 		echo
 		exit 1
 		"""
-
-
-rule register_gatk:
-	output: 'restricted-software/gatk-was-registered'
-	input: 'restricted-software/GenomeAnalysisTK.jar'
-	shell: 'gatk-register {input} && touch {output}'
 
 
 rule download:
@@ -465,7 +454,8 @@ rule gatk_read_backed_phasing:
 		bai='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bai',
 		vcf='vcf/{dataset,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.unphased.vcf',
 		ref=reference,
-		was_registered='restricted-software/gatk-was-registered'
+		dictfile=reference.replace('.fasta', '.dict'),
+		gatk_jar=gatk_jar
 	output:
 		vcf='phased/read-backed-phasing/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf',
 	log: 'phased/read-backed-phasing/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
@@ -474,7 +464,7 @@ rule gatk_read_backed_phasing:
 	run:
 		#input_line = ' '.join('-I ' + bam for bam in input.bams)
 		shell(r"""
-		{time} {gatk} -T ReadBackedPhasing \
+		{time} java -jar {gatk_jar} -T ReadBackedPhasing \
 			-R {input.ref} \
 			-I {input.bam} \
 			-L {input.vcf} \
@@ -677,3 +667,10 @@ rule index_reference:
 		'{path}.fasta'
 	shell:
 		"bwa index {input}"
+
+
+rule CreateSequenceDict:
+	output: '{base}.dict'
+	input: '{base}.fasta'
+	shell:
+		"picard CreateSequenceDictionary R={input} O={output}"
