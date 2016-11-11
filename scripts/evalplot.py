@@ -46,7 +46,19 @@ def read_table(path):
 	return table
 
 
-def plot(fig, table, yfunc, yaxislabel, loc=0, yscale=None, ylim=None):
+def read_components_table(path):
+	table = pd.read_table(path)
+	table['coverage'] = table['coverage'].apply(lambda x: 20 if x == 'all' else int(x))
+	table['individual'] = table['dataset'].apply(lambda x: {'ashk': 'real'}.get(x, x))
+	del table['dataset']
+	table['algorithm'] = 'ccomponents'
+	table['indels'] = table['indels'].apply(bool)
+	table.set_index(['indels', 'individual', 'algorithm', 'coverage'], inplace=True)
+	table.sort_index(inplace=True)
+	return table
+
+
+def plot(fig, table, yfunc, yaxislabel, loc=0, yscale=None, ylim=None, cc=False):
 	ALGORITHMS = [
 		('hapcut', 'hapCUT', 'o:'),
 		('read-backed-phasing', 'ReadBackedPhasing', 'o-.'),
@@ -54,6 +66,8 @@ def plot(fig, table, yfunc, yaxislabel, loc=0, yscale=None, ylim=None):
 		('whatshap-norealign', 'WhatsHap (no re-align)', 's:'),
 		('whatshap', 'WhatsHap', 's-')
 	]
+	if cc:
+		ALGORITHMS.append(('ccomponents', 'Theoretical optimum', 'k^:'))
 
 	for individual, title, index in [('sim', 'Simulated data', 1), ('real', 'Real data', 2)]:
 		ax = fig.add_subplot(1, 2, index)
@@ -65,7 +79,7 @@ def plot(fig, table, yfunc, yaxislabel, loc=0, yscale=None, ylim=None):
 			if t.empty:
 				continue
 			ax.plot(t['coverage'], yfunc(t), marker, label=name, markersize=5)
-			print(yaxislabel, 'at coverage', list(t['coverage'])[-1], 'for tool', algorithm, 'is', list(yfunc(t))[-1])
+			print('In individual', individual, yaxislabel, 'at coverages', list(t['coverage'][-3:-1]), 'for tool', algorithm, 'is', list(yfunc(t))[-3:-1])
 
 		# Setup axes
 
@@ -95,10 +109,22 @@ def main():
 	parser = ArgumentParser()
 	parser.add_argument('--type', choices=('switches', 'connections', 'indelswitches', 'indelphased'), default='switches')
 	parser.add_argument('summary_eval', help='summary.eval file')
+	parser.add_argument('summary_components', help='summary.components file')
 	parser.add_argument('plot', help='path to output PDF')
 	args = parser.parse_args()
 
 	table = read_table(args.summary_eval)
+	n_real_snvs = table.loc[(False, 'real', 'whatshap', 2)]['heterozygous_snvs']
+	n_sim_snvs = table.loc[(False, 'sim', 'whatshap', 2)]['heterozygous_snvs']
+
+	components_table = read_components_table(args.summary_components)
+	components_table.loc[(False, 'real'), 'heterozygous_snvs'] = n_real_snvs
+	components_table.loc[(False, 'sim'), 'heterozygous_snvs'] = n_sim_snvs
+	components_table['all_assessed_pairs'] = components_table['heterozygous_snvs'] - components_table['components']
+
+	table = table.append(components_table)
+	table.sort_index(inplace=True)
+
 	indel_table = table.xs(True, level='indels').copy()
 	noindel_table = table.xs(False, level='indels').copy()
 	del table
@@ -107,8 +133,6 @@ def main():
 	indel_table['extra_phased'] = (indel_table['phased'] - noindel_table['phased'])
 	indel_table['extra_switches'] = indel_table['all_switches'] - noindel_table['all_switches']
 
-	n_real_snvs = noindel_table.loc[('real', 'whatshap', 2)]['heterozygous_snvs']
-	n_sim_snvs = noindel_table.loc[('sim', 'whatshap', 2)]['heterozygous_snvs']
 	noindel_table.loc[('real',), 'connection_ratio'] = noindel_table.loc[:, 'all_assessed_pairs'] / (n_real_snvs - 1)
 	noindel_table.loc[('sim',), 'connection_ratio'] = noindel_table.loc[:, 'all_assessed_pairs'] / (n_sim_snvs - 1)
 
@@ -121,7 +145,7 @@ def main():
 		if args.type == 'switches':
 			plot(fig, noindel_table, lambda t: t['all_switch_rate'], yaxislabel='Switch error rate', yscale='log', ylim=(0.0001, 0.18))
 		elif args.type == 'connections':
-			plot(fig, noindel_table, lambda t: t['connection_ratio'], yaxislabel='Phase connection ratio', loc='lower right')
+			plot(fig, noindel_table, lambda t: t['connection_ratio'], yaxislabel='Phase connection ratio', loc='lower right', cc=True)
 		elif args.type == 'indelswitches':
 			plot(fig, indel_table, lambda t: t['extra_switches'] / t['extra_phased'], 'Extra switches per extra phased variants')
 		elif args.type == 'indelphased':
