@@ -63,53 +63,54 @@ and run
     md5sum -c MD5SUM
 
 For both files, you should see an `OK` message. This check is not run as part
-of the workflow because we want to give you the option of using different tools.
+of the workflow because we want to give you the option of using different
+versions of the tools.
 
 ## Install all other dependencies
 
 1. Install necessary system packages. We assume you use Debian or Ubuntu. If you
-  do not have root access on your system, you can try to ignore this step.
-  These packages are typically already installed.
+    do not have root access on your system, you can try to ignore this step.
+    These packages are typically already installed.
 
-    sudo apt-get install bzip2 wget unzip build-essential zlib1g-dev ncurses-dev pigz
+        sudo apt-get install bzip2 wget unzip build-essential zlib1g-dev ncurses-dev pigz
 
 2. Install hapCUT
 
-    wget -O hapcut.zip https://github.com/vibansal/hapcut/archive/844af08c.zip
-    unzip hapcut.zip
-    cd hapcut-*/
-    make
+        wget -O hapcut.zip https://github.com/vibansal/hapcut/archive/844af08c.zip
+        unzip hapcut.zip
+        cd hapcut-*/
+        make
 
-  Then copy the `extractHAIRS` and `HAPCUT` binaries to some location that is on
-  your `$PATH`.
+    Then copy the `extractHAIRS` and `HAPCUT` binaries to some location that is on
+    your `$PATH`.
 
 3. Install Miniconda. Most of the remaining dependencies are available as
-  packages in the [bioconda](http://bioconda.github.io/) Conda channel, for which
-  we need conda.
+    packages in the [bioconda](http://bioconda.github.io/) Conda channel, for which
+    we need conda.
 
-    wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
-    bash Miniconda3-latest-Linux-x86_64.sh
+        wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+        bash Miniconda3-latest-Linux-x86_64.sh
 
-  Then follow the instructions on screen. After conda is installed, add the
-  required channels to the configuration.
+    Then follow the instructions on screen. After conda is installed, add the
+    required channels to the configuration.
 
-    conda config --add channels bioconda --add channels r --add channels conda-forge
+        conda config --add channels bioconda --add channels r --add channels conda-forge
 
 4. Install all dependencies available as Conda packages.
 
-    conda install -y python=3.5.2 snakemake=3.7.1 samtools=1.2 picard=1.126 \
-        bedtools=2.23.0 vcftools=0.1.14 bwa=0.7.12 pbsim=1.0.3 whatshap=0.13
+        conda install -y python=3.5.2 snakemake=3.7.1 samtools=1.2 picard=1.126 \
+            bedtools=2.23.0 vcftools=0.1.14 bwa=0.7.12 pbsim=1.0.3 whatshap=0.13
 
 5. Install phASER into a separate conda environment.
 
-    conda create -y -n phaser python=2.7 intervaltree pyvcf scipy numpy samtools bedtools
-    wget -O phaser.zip https://github.com/secastel/phaser/archive/6b527927.zip
-    unzip phaser.zip
+        conda create -y -n phaser python=2.7 intervaltree pyvcf scipy numpy samtools bedtools
+        wget -O phaser.zip https://github.com/secastel/phaser/archive/6b527927.zip
+        unzip phaser.zip
 
-  Then copy `phaser-*/phaser/*.py` to a directory of your choosing.
-  TO DO: The description of this step is incomplete. You need to somehow make
-  sure that running `phaser` on the command-line works. See also the wrapper
-  `docker/phaser`.
+    Then copy `phaser-*/phaser/*.py` to a directory of your choosing.
+    TO DO: The description of this step is incomplete. You need to somehow make
+    sure that running `phaser` on the command-line works. See also the wrapper
+    `docker/phaser`.
 
 ## Run the workflow
 
