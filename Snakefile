@@ -676,7 +676,7 @@ rule summarize_connected_components:
 		"""
 		(
 			head -n1 {input.components[0]}
-			for f in $(sorted {input.components}); do
+			for f in $(sort {input.components}); do
 				sed 1d $f
 			done
 		) > {output}
