@@ -104,8 +104,8 @@ versions of the tools.
 5. Install phASER into a separate conda environment.
 
         conda create -y -n phaser python=2.7 intervaltree pyvcf scipy numpy samtools bedtools
-        wget -O phaser.zip https://github.com/secastel/phaser/archive/6b527927.zip
-        unzip phaser.zip
+        wget -O phaser-05832c1.zip https://github.com/secastel/phaser/archive/05832c1.zip
+        unzip phaser-05832c1.zip
 
     Then copy `phaser-*/phaser/*.py` to a directory of your choosing.
     TO DO: The description of this step is incomplete. You need to somehow make
