@@ -1,4 +1,4 @@
-# kate: syntax Python;
+# kate: syntax Python; space-indent off; indent-mode python; indent-width 4;
 """
 How to re-run this workflow
 ---------------------------
@@ -30,7 +30,7 @@ role_to_sampleid = {'mother':'HG004', 'father':'HG003', 'child':'HG002' }
 
 time = "/usr/bin/time -f '%M kB; real %e; user %U; sys %S'"
 
-# paths to scripts distributed along with the Snakefile
+# Paths to scripts distributed along with the Snakefile
 eval_plot = srcdir('scripts/evalplot.py')
 vcf_merge_trio = srcdir('scripts/vcf_merge_trio.pl')
 genomesimulator = srcdir('scripts/genomesimulator.py')
@@ -40,6 +40,8 @@ artificial_child = srcdir('scripts/artificial-child.py')
 phaser = 'phaser'
 extract_hairs = 'extractHAIRS'
 hapcut = 'HAPCUT'
+extract_hairs2 = 'extractHAIRS2'  # this is the extractHAIRS that comes with hapCUT 2
+hapcut2 = 'HAPCUT2'
 gzip = 'pigz'
 whatshap = 'whatshap'
 
@@ -103,7 +105,8 @@ rule gatk_missing:
 		"""
 
 
-rule download:
+rule download_ashkenazim:
+	threads: 100
 	output:
 		protected("download/AshkenazimTrio/{file}.{ext,(bam|bam.bai|vcf.gz)}")
 	shell:
@@ -514,6 +517,22 @@ rule extract_hairs:
 		shell("{time} {extract_hairs} --ref {input.ref} {extra} --VCF {input.vcf} --bam {input.bam} --maxIS 600 > {output.txt} 2> {log}")
 
 
+rule extract_hairs2:
+	"""hapCUT-2-specific pre-processing"""
+	output:
+		txt='hairs2/{indelsornot,(indels|noindels)}/' + hapcut_out + '.txt'
+	input:
+		ref=reference,
+		bam='bam/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.bam',
+		bai='bam/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.bai',
+		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
+	log:
+		'hairs/{indelsornot,(indels|noindels)}/' + hapcut_out + '.log'
+	run:
+		extra = ' --indels 1' if wildcards.indelsornot == 'indels' else ''
+		shell("{time} {extract_hairs2} --ref {input.ref} {extra} --VCF {input.vcf} --bam {input.bam} --maxIS 600 --out {output.txt} 2> {log}")
+
+
 rule hapcut:
 	output:
 		txt='phased/hapcut/{indelsornot,(indels|noindels)}/' + hapcut_out + '.txt'
@@ -525,6 +544,17 @@ rule hapcut:
 		"{time} {hapcut} --fragments {input.txt} --VCF {input.vcf} --output {output.txt} >& {log}"
 
 
+rule hapcut2:
+	output:
+		txt='phased/hapcut2/{indelsornot,(indels|noindels)}/' + hapcut_out + '.txt'
+	input:
+		txt='hairs2/{indelsornot}/' + hapcut_out + '.txt',
+		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
+	log: 'phased/hapcut2/{indelsornot}/' + hapcut_out + '.phase.log'
+	shell:
+		"{time} {hapcut2} --fragments {input.txt} --VCF {input.vcf} --output {output.txt} >& {log}"
+
+
 rule hapcut_to_vcf:
 	output:
 		vcf='phased/hapcut/{indelsornot,(indels|noindels)}/' + hapcut_out + '.vcf'
@@ -532,6 +562,17 @@ rule hapcut_to_vcf:
 		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
 		hapcut='phased/hapcut/{indelsornot}/' + hapcut_out + '.txt'
 	log: 'phased/hapcut/{indelsornot}/' + hapcut_out + '.vcf.log'
+	shell:
+		"{time} {whatshap} hapcut2vcf {input.vcf} {input.hapcut} > {output.vcf} 2> {log}"
+
+
+rule hapcut2_to_vcf:
+	output:
+		vcf='phased/hapcut2/{indelsornot,(indels|noindels)}/' + hapcut_out + '.vcf'
+	input:
+		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
+		hapcut='phased/hapcut2/{indelsornot}/' + hapcut_out + '.txt'
+	log: 'phased/hapcut2/{indelsornot}/' + hapcut_out + '.vcf.log'
 	shell:
 		"{time} {whatshap} hapcut2vcf {input.vcf} {input.hapcut} > {output.vcf} 2> {log}"
 
@@ -593,7 +634,7 @@ rule evaluate_phasing_tool:
 		truth='vcf/{dataset}.{individual}.chr{chromosome}.phased.vcf',
 		phased='phased/{program}/' + dataset_pattern + '.cov{coverage}.vcf'
 	output:
-		'eval/{program,(whatshap-norealign/noindels|whatshap/trio|whatshap/noindels|whatshap/indels|read-backed-phasing/noindels|hapcut/indels|hapcut/noindels|phaser/indels|phaser/noindels)}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.eval'
+		'eval/{program,(whatshap-norealign/noindels|whatshap/trio|whatshap/noindels|whatshap/indels|read-backed-phasing/noindels|hapcut/indels|hapcut/noindels|hapcut2/indels|hapcut2/noindels|phaser/indels|phaser/noindels)}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.eval'
 	log:
 		'eval/{program}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
 	shell:
@@ -639,7 +680,8 @@ rule connected_components:
 
 def all_eval_paths(extension):
 	l1 = expand('eval/{program}/{dataset}.pacbio.{individual}.chr1.cov{coverage}' + extension ,
-		program=['hapcut/indels', 'hapcut/noindels', 'read-backed-phasing/noindels',
+		program=['hapcut/indels', 'hapcut/noindels', 'hapcut2/indels', 'hapcut2/noindels',
+			'read-backed-phasing/noindels',
 			'whatshap-norealign/noindels', 'whatshap/noindels', 'whatshap/indels', 'whatshap/trio'],
 		dataset=datasets, individual=individuals, coverage=coverage),
 	l2 = expand('eval/phaser/{indels}/{dataset}.pacbio.{individual}.chr1.cov{coverage}' + extension,
