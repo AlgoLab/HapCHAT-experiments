@@ -3,7 +3,7 @@ FROM debian:jessie
 ENV LC_ALL C
 
 RUN apt-get -y update && \
-    apt-get -y install bzip2 wget unzip
+    apt-get -y install bzip2 wget unzip git pigz
     #&& rm -rf /var/lib/apt/lists/*
 
 # Install hapCUT
@@ -14,6 +14,15 @@ RUN wget -O hapcut.zip https://github.com/vibansal/hapcut/archive/844af08c.zip &
     make && \
     mv extractHAIRS HAPCUT /usr/bin/ && \
     rm -rf hapcut*
+
+# Install hapCUT2
+RUN git clone https://github.com/pjedge/hapcut2.git && \
+    cd hapcut2 && \
+    git reset --hard d96542fa839e11dc319e85d228dcec444e563b61 && \
+    make && \
+    mv build/extractHAIRS /usr/bin/extractHAIRS2 && \
+    mv build/HAPCUT2 /usr/bin && \
+    rm -rf hapcut2
 
 # Install Miniconda
 RUN echo 'export PATH=/opt/miniconda/bin:$PATH' > /etc/profile.d/conda.sh && \
@@ -36,7 +45,5 @@ RUN conda create -y -n phaser python=2.7 intervaltree pyvcf scipy numpy samtools
 RUN wget -O phaser.zip https://github.com/secastel/phaser/archive/05832c1.zip && \
     unzip phaser.zip && mkdir /opt/phaser/ && mv phaser-*/phaser/*.py /opt/phaser/ && rm -r phaser-*/
 COPY phaser /usr/bin/
-
-RUN apt-get install -y pigz
 
 WORKDIR /io/
