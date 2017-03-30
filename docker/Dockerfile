@@ -35,7 +35,8 @@ RUN conda config --add channels bioconda --add channels r --add channels conda-f
 # Install all dependencies available as conda packages
 RUN conda install -y python=3.5.2 snakemake=3.7.1 samtools=1.2 picard=1.126 \
         bedtools=2.23.0 vcftools=0.1.14 bwa=0.7.12 pbsim=1.0.3 whatshap=0.13 \
-        gatk=3.5
+        biopython=1.68
+#        gatk=3.5
 # desired picard 1.130 is not available
 # desired vcftools r940 is not available
 # pbsim version unclear, chose most probable one
