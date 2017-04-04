@@ -31,8 +31,8 @@ Further things to know:
 
 The workflow uses the statistical-phasing tool [SHAPEIT](http://shapeit.fr) and
 the [Genome Analysis Toolkit (GATK)](https://software.broadinstitute.org/gatk/),
-both of which cannot be re-distributed due to their licensing. Before starting
-the workflow, you need to install them manually.
+both of which cannot be re-distributed due to the way they are licensed. Before
+starting the workflow, you need to install them manually.
 
 ### SHAPEIT
 
@@ -84,9 +84,13 @@ versions of the tools.
     Then copy the `extractHAIRS` and `HAPCUT` binaries to some location that is on
     your `$PATH`.
 
-3. Install Miniconda. Most of the remaining dependencies are available as
-    packages in the [bioconda](http://bioconda.github.io/) Conda channel, for which
-    we need conda.
+3. Install hapCUT2
+
+    TODO (very similar to above)
+
+4. Install Miniconda. Most of the remaining dependencies are available as
+  packages in the [bioconda](http://bioconda.github.io/) Conda channel, for which
+  we need conda.
 
         wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
         bash Miniconda3-latest-Linux-x86_64.sh
@@ -96,12 +100,12 @@ versions of the tools.
 
         conda config --add channels bioconda --add channels r --add channels conda-forge
 
-4. Install all dependencies available as Conda packages.
+5. Install all dependencies available as Conda packages.
 
         conda install -y python=3.5.2 snakemake=3.7.1 samtools=1.2 picard=1.126 \
             bedtools=2.23.0 vcftools=0.1.14 bwa=0.7.12 pbsim=1.0.3 whatshap=0.13
 
-5. Install phASER into a separate conda environment.
+6. Install phASER into a separate conda environment.
 
         conda create -y -n phaser python=2.7 intervaltree pyvcf scipy numpy samtools bedtools
         wget -O phaser-05832c1.zip https://github.com/secastel/phaser/archive/05832c1.zip
