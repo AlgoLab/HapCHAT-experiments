@@ -42,9 +42,16 @@ RUN conda install -y python=3.5.2 snakemake=3.7.1 samtools=1.2 picard=1.126 \
 # pbsim version unclear, chose most probable one
 
 # Install phASER into a separate env
-RUN conda create -y -n phaser python=2.7 intervaltree pyvcf scipy numpy samtools bedtools
+RUN conda create -y -n phaser python=2.7 intervaltree pyvcf scipy numpy samtools bedtools Cython
 RUN wget -O phaser.zip https://github.com/secastel/phaser/archive/05832c1.zip && \
-    unzip phaser.zip && mkdir /opt/phaser/ && mv phaser-*/phaser/*.py /opt/phaser/ && rm -r phaser-*/
+    unzip phaser.zip && \
+    cd phaser-*/phaser && \
+    mkdir /opt/phaser/ && \
+    /opt/miniconda/envs/phaser/bin/python setup.py build_ext -i && \
+    mv *.py *.so /opt/phaser/ && \
+    cd ../.. && \
+    rm -r phaser-*/
+
 COPY phaser /usr/bin/
 
 WORKDIR /io/
