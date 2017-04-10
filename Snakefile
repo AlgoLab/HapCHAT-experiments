@@ -445,7 +445,7 @@ rule merge_hap_bams:
 	log: 'bam/sim.pacbio.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.covall.bam.log'
 	priority: 5
 	message: 'Merging haplotype-specific BAM files to create {output.bam}'
-	shell: '{time} picard MergeSamFiles {picard_tmpdir_switch} VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=50000 SORT_ORDER=coordinate CREATE_INDEX=true CREATE_MD5_FILE=true I={input.bam1} I={input.bam2} O={output.bam} >& {log}'
+	shell: '{time} picard -Xmx8g MergeSamFiles {picard_tmpdir_switch} VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=50000 SORT_ORDER=coordinate CREATE_INDEX=true CREATE_MD5_FILE=true I={input.bam1} I={input.bam2} O={output.bam} >& {log}'
 
 
 ## Rules for running the phasing tools.
