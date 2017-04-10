@@ -103,7 +103,8 @@ versions of the tools.
 5. Install all dependencies available as Conda packages.
 
         conda install -y python=3.5.2 snakemake=3.7.1 samtools=1.2 picard=1.126 \
-            bedtools=2.23.0 vcftools=0.1.14 bwa=0.7.12 pbsim=1.0.3 whatshap=0.13
+            bedtools=2.23.0 vcftools=0.1.14 bwa=0.7.12 pbsim=1.0.3 whatshap=0.13 \
+            biopython=1.68
 
 6. Install phASER into a separate conda environment.
 
