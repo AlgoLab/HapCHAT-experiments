@@ -572,13 +572,15 @@ rule phaser:
 	input:
 		bam='bam/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.bam',
 		bai='bam/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.bai',
-		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
+		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf.gz',
+		tbi='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf.gz.tbi',
 	log:
 		'phased/phaser/{indelsornot}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
 	run:
 		extra = ' --include_indels 1' if wildcards.indelsornot == 'indels' else ' --include_indels 0'
 		sample = role_to_sampleid[wildcards.individual]
 		shell("{time} {phaser}{extra} --bam {input.bam} --write_vcf 1 --gw_phase_vcf 2 --pass_only 0 --vcf {input.vcf} --sample {sample} --mapq 1 --baseq 1 --paired_end 0 --o {params.base} >& {log}")
+		shell("gunzip {params.base}.vcf.gz")
 		#shell(r"sed -i.orig '/^#/!s|\bGT:PG:|PG:GT:|;/^#/!s|:PI:|:PS:|' {params.base}.vcf")
 
 
