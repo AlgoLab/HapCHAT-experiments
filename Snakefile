@@ -627,7 +627,7 @@ rule evaluate_phasing_tool:
 	log:
 		'eval/{program}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
 	shell:
-		'{whatshap} compare --names truth,{wildcards.program} --tsv {output} {input.truth} {input.phased} 2>&1 > {log}'
+		'{whatshap} compare --names truth,{wildcards.program} --tsv-pairwise {output} {input.truth} {input.phased} 2>&1 > {log}'
 
 
 rule whatshap_stats:
