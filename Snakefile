@@ -17,6 +17,7 @@ docker run -it -v $PWD:/io/ whatshap snakemake -np
 """
 
 import pysam
+import textwrap
 
 picard_tmpdir_switch = ''
 if 'TMPDIR' in os.environ:
@@ -176,15 +177,22 @@ rule downsample:
 
 
 rule add_read_groups:
+	"""Add RG, prepend sample names to read names, strip unused tags"""
 	input: 'bam/incorrect-readgroup/ashk.{platform,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.cov{coverage,([0-9]+|all)}.bam'
 	output: 
 		bam='bam/ashk.{platform,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.cov{coverage,([0-9]+|all)}.bam',
 		bai='bam/ashk.{platform,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.cov{coverage,([0-9]+|all)}.bai'
 	log: 'bam/ashk.{platform,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.cov{coverage,([0-9]+|all)}.readgroup.log'
-	message: 'Adding read group and prepending read names'
 	run: 
 		sample = role_to_sampleid[wildcards.individual]
-		shell('(samtools view -h {input} | sed \'/^[^@]/ s|^|{wildcards.individual}_|g\' | samtools view -u - | picard AddOrReplaceReadGroups {picard_tmpdir_switch} CREATE_INDEX=true VALIDATION_STRINGENCY=LENIENT I=/dev/stdin O={output.bam} ID={wildcards.individual} LB=UNKNOWN PL=PACBIO PU=UNKNOWN SM={sample}) > {log} 2>&1')
+		shell(textwrap.dedent(
+			"""
+			( samtools view -h {input} | \\
+				sed '/^[^@]/ s|^|{wildcards.individual}_|g' | \\
+				sed -re 's_\\t(dq|dt|ip|iq|st|sq|mq):Z:[^\\t]*__g' | \\
+				samtools view -u - | \\
+				picard AddOrReplaceReadGroups {picard_tmpdir_switch} CREATE_INDEX=true VALIDATION_STRINGENCY=LENIENT I=/dev/stdin O={output.bam} ID={wildcards.individual} LB=UNKNOWN PL=PACBIO PU=UNKNOWN SM={sample}) > {log} 2>&1
+			"""))
 
 
 rule bam_to_fastq:
