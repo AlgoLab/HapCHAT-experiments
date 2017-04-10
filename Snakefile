@@ -517,22 +517,6 @@ rule extract_hairs:
 		shell("{time} {extract_hairs} --ref {input.ref} {extra} --VCF {input.vcf} --bam {input.bam} --maxIS 600 > {output.txt} 2> {log}")
 
 
-rule extract_hairs2:
-	"""hapCUT-2-specific pre-processing"""
-	output:
-		txt='hairs2/{indelsornot,(indels|noindels)}/' + hapcut_out + '.txt'
-	input:
-		ref=reference,
-		bam='bam/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.bam',
-		bai='bam/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.bai',
-		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
-	log:
-		'hairs/{indelsornot,(indels|noindels)}/' + hapcut_out + '.log'
-	run:
-		extra = ' --indels 1' if wildcards.indelsornot == 'indels' else ''
-		shell("{time} {extract_hairs2} --ref {input.ref} {extra} --VCF {input.vcf} --bam {input.bam} --maxIS 600 --out {output.txt} 2> {log}")
-
-
 rule hapcut:
 	output:
 		txt='phased/hapcut/{indelsornot,(indels|noindels)}/' + hapcut_out + '.txt'
@@ -544,11 +528,14 @@ rule hapcut:
 		"{time} {hapcut} --fragments {input.txt} --VCF {input.vcf} --output {output.txt} >& {log}"
 
 
+# We use the extractHAIRS distributed with hapCUT as the one distributed with
+# hapCUT 2 gives unusable output (perhaps the same problem as the one that
+# we fixed in the hapCUT 1 version with SAM = and X operators)
 rule hapcut2:
 	output:
 		txt='phased/hapcut2/{indelsornot,(indels|noindels)}/' + hapcut_out + '.txt'
 	input:
-		txt='hairs2/{indelsornot}/' + hapcut_out + '.txt',
+		txt='hairs/{indelsornot}/' + hapcut_out + '.txt',
 		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
 	log: 'phased/hapcut2/{indelsornot}/' + hapcut_out + '.phase.log'
 	shell:
