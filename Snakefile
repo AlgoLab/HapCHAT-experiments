@@ -8,10 +8,13 @@ Install dependencies:
 - (see Dockerfile)
 - make 'gatk' binary available
 - make 'shapeit' binary available
-- cp human reference and BWA index into reference/ if you already have it
+- copy human reference and BWA index into reference/ if you already have it
   (downloaded and generated otherwise)
 
-docker run -it -v $PWD:/io/ whatshap snakemake -np
+cd docker
+sudo docker build -t whatshap-experiments .
+
+docker run -it -v $PWD:/io/ whatshap-experiments snakemake -np
 
 
 """
@@ -121,7 +124,10 @@ rule download_reference:
 		"""
 		wget -O {output}.gz.incomplete ftp://ftp.ncbi.nlm.nih.gov/1000genomes/ftp/technical/reference/human_g1k_v37.fasta.gz
 		mv {output}.gz.incomplete {output}.gz
-		gunzip {output}.gz
+		# gunzip fails with "decompression OK, trailing garbage ignored" because
+		# the file is razf-compressed (gzip-compatible, but with an index at end)
+		gunzip {output}.gz || true
+		cd reference && md5sum -c MD5SUM
 		"""
 
 
