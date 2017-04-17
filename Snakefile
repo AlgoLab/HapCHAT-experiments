@@ -126,7 +126,7 @@ rule download_reference:
 		mv {output}.gz.incomplete {output}.gz
 		# gunzip fails with "decompression OK, trailing garbage ignored" because
 		# the file is razf-compressed (gzip-compatible, but with an index at end)
-		gunzip {output}.gz || true
+		gunzip -f {output}.gz || true
 		cd reference && md5sum -c MD5SUM
 		"""
 
@@ -594,7 +594,7 @@ rule phaser:
 		extra = ' --include_indels 1' if wildcards.indelsornot == 'indels' else ' --include_indels 0'
 		sample = role_to_sampleid[wildcards.individual]
 		shell("{time} {phaser}{extra} --bam {input.bam} --write_vcf 1 --gw_phase_vcf 2 --pass_only 0 --vcf {input.vcf} --sample {sample} --mapq 1 --baseq 1 --paired_end 0 --o {params.base} >& {log}")
-		shell("gunzip {params.base}.vcf.gz")
+		shell("gunzip -f {params.base}.vcf.gz")
 		#shell(r"sed -i.orig '/^#/!s|\bGT:PG:|PG:GT:|;/^#/!s|:PI:|:PS:|' {params.base}.vcf")
 
 
