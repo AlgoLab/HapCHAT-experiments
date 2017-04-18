@@ -703,7 +703,7 @@ rule evaluation_summary:
 		"""
 		(
 			paste {input.evals[0]} {input.stats[0]} | head -n1
-			for e in $(sort {input.evals}); do
+			for e in {input.evals}; do
 				s=${{e%%.eval}}.stats
 				paste $e $s | sed 1d
 			done
@@ -721,7 +721,7 @@ rule summarize_connected_components:
 		"""
 		(
 			head -n1 {input.components[0]}
-			for f in $(sort {input.components}); do
+			for f in {input.components}; do
 				sed 1d $f
 			done
 		) > {output}
