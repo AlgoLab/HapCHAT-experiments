@@ -63,6 +63,7 @@ def read_components_table(path):
 def plot(fig, table, yfunc, yaxislabel, loc=0, yscale=None, ylim=None, cc=False):
 	ALGORITHMS = [
 		('hapcut', 'hapCUT', 'o:'),
+		('hapcut2', 'hapCUT2', 's--'),
 		('read-backed-phasing', 'ReadBackedPhasing', 'o-.'),
 		('phaser', 'phASER', 'o--'),
 		('whatshap-norealign', 'WhatsHap (no re-align)', 's:'),
