@@ -104,7 +104,7 @@ versions of the tools.
 
         conda install -y python=3.5.2 snakemake=3.7.1 samtools=1.2 picard=1.126 \
             bedtools=2.23.0 vcftools=0.1.14 bwa=0.7.12 pbsim=1.0.3 whatshap=0.13 \
-            biopython=1.68 htslib=1.4
+            biopython=1.68 htslib=1.4 seaborn=0.7.1 pandas=0.19.2 matplotlib=2.0.0
 
 6. Install phASER into a separate conda environment.
 
