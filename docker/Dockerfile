@@ -50,4 +50,6 @@ RUN wget -O phaser.zip https://github.com/secastel/phaser/archive/05832c1.zip &&
 
 COPY phaser /usr/bin/
 
+RUN conda install -y Cython && conda remove whatshap && pip install https://bitbucket.org/whatshap/whatshap/get/459899e25e93.zip
+
 WORKDIR /io/
