@@ -3,7 +3,7 @@ FROM debian:jessie
 ENV LC_ALL C
 
 RUN apt-get -y update && \
-    apt-get -y install bzip2 wget unzip git pigz
+    apt-get -y install bzip2 wget unzip git pigz time
     #&& rm -rf /var/lib/apt/lists/*
 
 # Install hapCUT
