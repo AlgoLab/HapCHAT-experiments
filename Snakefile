@@ -195,8 +195,8 @@ rule downsample:
 
 
 rule unphase:
-	input: '{base}.phased.vcf'
-	output: '{base}.unphased.vcf'
+	input: 'platinum/NA12878.vcf.gz'
+	output: 'vcf/unphased.chr1.vcf'
 	shell: '{whatshap} unphase {input} > {output}'
 
 
@@ -347,6 +347,12 @@ rule whatshap_indels:  # with re-alignment
 
 ## Evaluation: compare phasing results to ground truth, get VCF statistics
 
+rule make_truth:
+	input: 'platinum/NA12878.vcf.gz'
+	output: 'vcf/truth.chr{chromosome}.vcf'
+	shell:
+		""#TODO
+
 
 rule evaluate_phasing_tool:
 	input:
@@ -403,7 +409,7 @@ def all_eval_paths(extension):
 		dataset=datasets, coverage=coverage),
 	# Exclude because they did not finish within 24h
 	#l2 = tuple(s for s in l2 if not ('/ashk.' in s and '.covall.' in s))
-	return l1 + l2
+	return l1 #+ l2
 
 
 rule evaluation_summary:
@@ -462,6 +468,12 @@ rule vcf_bgzip:
 	input: '{path}.vcf'
 	output: '{path}.vcf.gz'
 	shell: 'bgzip < {input} > {output}'
+
+
+rule samtools_index:
+	input: '{path}.covall.bam'
+	output: '{path}.covall.bai'
+	shell: 'samtools index -o {output} {input}'
 
 
 #rule index_reference:
