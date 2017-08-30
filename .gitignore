@@ -2,3 +2,6 @@
 restricted-software/GenomeAnalysisTK.jar
 reference/GRCh38_full_analysis_set_plus_decoy_hla.*
 reference/OK
+.snakemake/
+nanopore/chr1.sorted.bam
+platinum/NA12878.vcf.gz
