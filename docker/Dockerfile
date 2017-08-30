@@ -36,7 +36,9 @@ ENV PATH /opt/miniconda/bin:$PATH
 RUN conda config --add channels conda-forge --add channels bioconda
 
 # Install all dependencies available as conda packages
-RUN conda install -y python=3.6.2 snakemake=4.0.0 samtools=1.5 picard=2.10.6 \
+# Do not increase the Picard version number - later versions do not
+# support the random sampling options we use.
+RUN conda install -y python=3.6.2 snakemake=4.0.0 samtools=1.5 picard=1.126 \
         bedtools=2.26.0 vcftools=0.1.14 whatshap=0.14.1 \
         htslib=1.5 seaborn=0.7.1 pandas=0.20.3 matplotlib=2.0.2
 
