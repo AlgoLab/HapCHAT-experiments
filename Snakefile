@@ -85,23 +85,6 @@ rule clean:
 
 ## Rules for external dependencies: Software and data files
 
-rule shapeit_missing:
-	output: shapeit
-	shell:
-		"""
-		echo
-		echo "Due to licensing restrictions, you need to manually download "
-		echo "shapeit and make it available to this pipeline."
-		echo
-		echo "Go to https://mathgen.stats.ox.ac.uk/genetics_software/shapeit/shapeit.html#download ,"
-		echo "download version v2.r837 (shapeit.v2.r837.GLIBCv2.12.Linux.static.tgz),"
-		echo "unpack the tgz file and place the bin/shapeit binary into '{shapeit}'."
-		echo "Then re-run snakemake."
-		echo
-		exit 1
-		"""
-
-
 rule gatk_missing:
 	output: gatk_jar
 	shell:
