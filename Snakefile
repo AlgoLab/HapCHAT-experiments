@@ -47,6 +47,18 @@ hapcut2 = 'HAPCUT2'
 gzip = 'pigz'
 whatshap = 'whatshap'
 
+ALGORITHMS = [
+	'hapcut/indels',
+	'hapcut/noindels',
+	'hapcut2/indels',
+	'hapcut2/noindels',
+	'read-backed-phasing/noindels',
+	'whatshap-norealign/noindels',
+	'whatshap/noindels',
+	'whatshap/indels',
+	# 'whatshap/trio',
+]
+
 # Software that must be installed manually prior to running
 # the Snakefile due to licensing restrictions
 shapeit = 'restricted-software/shapeit'
@@ -378,12 +390,12 @@ rule copy_gen_map_sim:
 	shell: 'ln -fsrv {input} {output}'
 
 
+## Trio phasing rules are unused
+
 rule create_trio_ped:
 	output: 'trio.ped'
 	shell: 'echo family HG002 HG003 HG004 0 0 > {output}'
 
-
-## Trio phasing rules are unused
 
 rule trio_whatshap:
 	input:
@@ -680,10 +692,8 @@ rule connected_components:
 ## Create two tables with evaluation results
 
 def all_eval_paths(extension):
-	l1 = expand('eval/{program}/{dataset}.pacbio.{individual}.chr1.cov{coverage}' + extension ,
-		program=['hapcut/indels', 'hapcut/noindels', 'hapcut2/indels', 'hapcut2/noindels',
-			'read-backed-phasing/noindels',
-			'whatshap-norealign/noindels', 'whatshap/noindels', 'whatshap/indels', 'whatshap/trio'],
+	l1 = expand('eval/{program}/{dataset}.pacbio.{individual}.chr1.cov{coverage}' + extension,
+		program=ALGORITHMS,
 		dataset=datasets, individual=individuals, coverage=coverage),
 	l2 = expand('eval/phaser/{indels}/{dataset}.pacbio.{individual}.chr1.cov{coverage}' + extension,
 		indels=['indels', 'noindels'], dataset=datasets, individual=individuals, coverage=coverage)
