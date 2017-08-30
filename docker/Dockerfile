@@ -33,12 +33,12 @@ RUN echo 'export PATH=/opt/miniconda/bin:$PATH' > /etc/profile.d/conda.sh && \
     bash Miniconda3-latest-Linux-x86_64.sh -b -p /opt/miniconda && \
     rm Miniconda3-latest-Linux-x86_64.sh
 ENV PATH /opt/miniconda/bin:$PATH
-RUN conda config --add channels bioconda --add channels r --add channels conda-forge
+RUN conda config --add channels conda-forge --add channels bioconda
 
 # Install all dependencies available as conda packages
-RUN conda install -y python=3.5.2 snakemake=3.7.1 samtools=1.2 picard=1.126 \
-        bedtools=2.23.0 vcftools=0.1.14 bwa=0.7.12 pbsim=1.0.3 whatshap=0.13 \
-        biopython=1.68 htslib=1.4 seaborn=0.7.1 pandas=0.19.2 matplotlib=2.0.0
+RUN conda install -y python=3.6.2 snakemake=4.0.0 samtools=1.5 picard=2.10.6 \
+        bedtools=2.26.0 vcftools=0.1.14 whatshap=0.14.1 \
+        htslib=1.5 seaborn=0.7.1 pandas=0.20.3 matplotlib=2.0.2
 
 # Install phASER into a separate env
 RUN conda create -y -n phaser python=2.7 intervaltree pyvcf scipy numpy samtools bedtools Cython
@@ -52,7 +52,5 @@ RUN wget -O phaser.zip https://github.com/secastel/phaser/archive/05832c1.zip &&
     rm -r phaser-*/
 
 COPY phaser /usr/bin/
-
-RUN conda install -y Cython && conda remove whatshap && pip install https://bitbucket.org/whatshap/whatshap/get/459899e25e93.zip
 
 WORKDIR /io/
