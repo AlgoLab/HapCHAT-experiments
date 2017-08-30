@@ -72,6 +72,7 @@ dataset_pattern = '{dataset,[a-z]+}.{platform,[a-z]+}.{individual,(mother|father
 
 rule master:
 	input:
+		'reference/OK',
 		'eval/summary.eval',
 		expand('eval/{type}.pdf', type=['switches', 'connections', 'indelswitches', 'indelphased'])
 
@@ -127,14 +128,23 @@ rule download_ashkenazim:
 		"wget -O {output} ftp://ftp-trace.ncbi.nlm.nih.gov/giab/ftp/data/AshkenazimTrio/{wildcards.file}.{wildcards.ext}"
 
 
+rule references_ok:
+	output:
+		'reference/OK'
+	input:
+		expand('reference/GRCh38_full_analysis_set_plus_decoy_hla.{ext}',
+			ext=['dict', 'fa', 'fa.alt', 'fa.amb', 'fa.ann', 'fa.bwt', 'fa.fai', 'fa.pac', 'fa.sa'])
+	shell:
+		"cd reference && md5sum -c MD5SUM && touch OK"
+
+
 rule download_reference:
 	output:
-		'reference/GRCh38_full_analysis_set_plus_decoy_hla.fa'
+		'reference/GRCh38_full_analysis_set_plus_decoy_hla.{ext}'
 	shell:
 		"""
-		wget -O {output}.incomplete ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/reference/GRCh38_reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.fa
+		wget -O {output}.incomplete ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/reference/GRCh38_reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.{wildcards.ext}
 		mv {output}.incomplete {output}
-		cd reference && md5sum -c MD5SUM
 		"""
 
 
@@ -757,17 +767,17 @@ rule vcf_bgzip:
 	shell: 'bgzip < {input} > {output}'
 
 
-rule index_reference:
-	output:
-		'{path}.fasta.bwt'
-	input:
-		'{path}.fasta'
-	shell:
-		"bwa index {input}"
+#rule index_reference:
+	#output:
+		#'{path}.fasta.bwt'
+	#input:
+		#'{path}.fasta'
+	#shell:
+		#"bwa index {input}"
 
 
-rule CreateSequenceDict:
-	output: '{base}.dict'
-	input: '{base}.fasta'
-	shell:
-		"picard CreateSequenceDictionary R={input} O={output}"
+#rule CreateSequenceDict:
+	#output: '{base}.dict'
+	#input: '{base}.fasta'
+	#shell:
+		#"picard CreateSequenceDictionary R={input} O={output}"
