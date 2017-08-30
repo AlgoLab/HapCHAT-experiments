@@ -2,8 +2,11 @@ FROM debian:jessie
 
 ENV LC_ALL C
 
+# The system samtools is used only to download a BAM from a HTTPS URL
+# The conda samtools package (which we use for everything else) does
+# not support this.
 RUN apt-get -y update && \
-    apt-get -y install bzip2 wget unzip git pigz time
+    apt-get -y install bzip2 wget unzip git pigz time samtools
     #&& rm -rf /var/lib/apt/lists/*
 
 # Install hapCUT

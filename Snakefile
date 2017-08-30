@@ -135,8 +135,13 @@ rule download_pacbio:
 	output:
 		'pacbio/hg38.NA12878-WashU.chr1.bam'
 	shell:
-		'samtools view -b https://downloads.pacbcloud.com/public/dataset/na12878/hg38.NA12878-WashU.bam chr1 > {output}'
+		# The conda samtools packages do not support HTTPS URLs, so use the
+		# system samtools if it is available
+		"""
+		if test -x /usr/bin/samtools; then SAMTOOLS=/usr/bin/samtools; else SAMTOOLS=samtools; fi
+		$SAMTOOLS view -b https://downloads.pacbcloud.com/public/dataset/na12878/hg38.NA12878-WashU.bam chr1 > {output}
 		# TODO will MD5SUM always be the same?
+		"""
 
 
 rule download_nanopore:
