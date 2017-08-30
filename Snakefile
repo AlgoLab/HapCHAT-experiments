@@ -25,7 +25,7 @@ if 'TMPDIR' in os.environ:
 	picard_tmpdir_switch = 'TMP_DIR=%s' % os.environ['TMPDIR']
 
 datasets = ['ashk', 'sim']
-individuals = ['child']  #['mother', 'father', 'child']
+individuals = ['child']
 coverage = [2, 3, 4, 5, 10, 15, 'all']
 reference = 'reference/GRCh38_full_analysis_set_plus_decoy_hla.fa'
 role_to_sampleid = {'mother':'HG004', 'father':'HG003', 'child':'HG002' }
@@ -44,7 +44,6 @@ extract_hairs = 'extractHAIRS'
 hapcut = 'HAPCUT'
 extract_hairs2 = 'extractHAIRS2'  # this is the extractHAIRS that comes with hapCUT 2
 hapcut2 = 'HAPCUT2'
-gzip = 'pigz'
 whatshap = 'whatshap'
 
 ALGORITHMS = [
@@ -56,7 +55,6 @@ ALGORITHMS = [
 	'whatshap-norealign/noindels',
 	'whatshap/noindels',
 	'whatshap/indels',
-	# 'whatshap/trio',
 ]
 
 # Software that must be installed manually prior to running
@@ -134,25 +132,15 @@ rule download_platinum:
 		"""
 
 
-## Downsample BAM files, add read group information, etc.
-
-
-def ashkenazim_trio_bam(wildcards):
-	individual = {
-		'mother': dict(name='mother', id='4', na='24143'),
-		'father': dict(name='father', id='3', na='24149'),
-		'child': dict(name='son', id='2', na='24385'),
-	}[wildcards.individual]
-	individual['chromosome'] = wildcards.chromosome
-	individual['ext'] = wildcards.ext
-	return 'download/AshkenazimTrio/HG00{id}_NA{na}_{name}/PacBio_MtSinai_NIST/MtSinai_'\
-			'blasr_bam_GRCh37/hg00{id}_gr37_{chromosome}.{ext}'.format(**individual)
-
-
-rule create_ashk_pacbio_links:
-	input: ashkenazim_trio_bam
-	output: 'bam/incorrect-readgroup/ashk.pacbio.{individual}.chr{chromosome,[0-9]+}.covall.{ext,(bam|bam.bai)}'
-	shell: 'ln -fsrv {input} {output}'
+rule download_nanopore:
+	output:
+		'nanopore/chr1.sorted.bam'
+	shell:
+		"""
+		wget -O {output}.incomplete http://s3.amazonaws.com/nanopore-human-wgs/chr1.sorted.bam
+		mv {output}.incomplete {output}
+		cd nanopore && md5sum -c MD5SUM
+		"""
 
 
 rule calculate_coverage:
@@ -210,233 +198,10 @@ rule bam_to_fastq:
 	shell: 'bedtools bamtofastq -i {input} -fq {output}'
 
 
-## Prepare the downloaded VCF files: Extract chromosome 1, filter, etc.
-
-
-rule unzip_vcf:
-	input: 'download/AshkenazimTrio/analysis/NIST_CallsIn2Technologies_05182015/HG{id}-multiall-fullcombine.vcf.gz'
-	output: 'unphased-ashk/HG{id,[0-9]+}-multiall-fullcombine.vcf'
-	shell: 'zcat {input} > {output}'
-
-
-rule filter_vcfs:
-	input:
-		mother='unphased-ashk/HG004-multiall-fullcombine.vcf',
-		father='unphased-ashk/HG003-multiall-fullcombine.vcf',
-		child='unphased-ashk/HG002-multiall-fullcombine.vcf'
-	output: 'vcf/ashk.trio.unphased.vcf'
-	log: 'vcf/ashk.trio.unphased.vcf.log'
-	message: 'Filtering and merging input VCFs to create {output}'
-	version: 2
-	shell:
-		r"{vcf_merge_trio} {input.mother} {input.father} {input.child} | sed '/^[^#]/ s| |\t|g; s_0|1_0/1_g; s_1|0_0/1_g; s_1/0_0/1_g; s_1|1_1/1_g; s_0|0_0/0_g' > {output} 2> {log}"
-
-
-rule split_vcf:
-	input: 'vcf/ashk.trio.unphased.vcf'
-	output: 'vcf/ashk.trio.chr{chromosome,[0-9]+}.unphased.vcf'
-	message: 'Extracting chromosome {wildcards.chromosome} from {input}'
-	shell: """awk '/^#/ || ($1 == "{wildcards.chromosome}")' {input} > {output}"""
-
-
-#rule shapeit_create_ped:
-	#input: 'vcf/ashk.trio.chr{chromosome,[0-9]+}.unphased.vcf'
-	#output: 'shapeit/trio.chr{chromosome,[0-9]+}.ped'
-	#log: 'shapeit/trio.chr{chromosome,[0-9]+}.ped.log'
-	#message: 'Creating PED file {output}'
-	#shell: 'vcf-to-ped.py {input} {output} > {log} 2>&1'
-
-
 rule unphase:
 	input: '{base}.phased.vcf'
 	output: '{base}.unphased.vcf'
 	shell: '{whatshap} unphase {input} > {output}'
-
-
-## Compute "ground truth" phasing with SHAPEIT
-
-rule download_1000GP:
-	output: 'download/1000GP_Phase3/{filename}'
-	shell: 'wget -O {output} http://mathgen.stats.ox.ac.uk/impute/1000GP_Phase3/{wildcards.filename}'
-
-
-rule shapeit_check:
-	input:
-		legend='download/1000GP_Phase3/1000GP_Phase3_chr{chromosome,[0-9]+}.legend.gz',
-		genmap='download/1000GP_Phase3/genetic_map_chr{chromosome,[0-9]+}_combined_b37.txt',
-		refhaps='download/1000GP_Phase3/1000GP_Phase3_chr{chromosome,[0-9]+}.hap.gz',
-		refsamples='download/1000GP_Phase3/1000GP_Phase3.sample',
-		vcf='vcf/ashk.trio.chr{chromosome,[0-9]+}.unphased.vcf',
-		shapeit=shapeit,
-	output: 'shapeit/trio.chr{chromosome,[0-9]+}.snp.strand', 'shapeit/trio.chr{chromosome,[0-9]+}.snp.strand.exclude'
-	log: 'shapeit/trio.chr{chromosome,[0-9]+}.check.log'
-	shell: '({shapeit} -check -V {input.vcf} -M {input.genmap} --input-ref {input.refhaps} {input.legend} {input.refsamples} --output-log shapeit/trio.chr{wildcards.chromosome} || true) > {log} 2>&1'
-
-
-rule shapeit:
-	input:
-		legend='download/1000GP_Phase3/1000GP_Phase3_chr{chromosome,[0-9]+}.legend.gz',
-		genmap='download/1000GP_Phase3/genetic_map_chr{chromosome,[0-9]+}_combined_b37.txt',
-		refhaps='download/1000GP_Phase3/1000GP_Phase3_chr{chromosome,[0-9]+}.hap.gz',
-		refsamples='download/1000GP_Phase3/1000GP_Phase3.sample',
-		vcf='vcf/ashk.trio.chr{chromosome,[0-9]+}.unphased.vcf',
-		exclude='shapeit/trio.chr{chromosome,[0-9]+}.snp.strand.exclude',
-		shapeit=shapeit,
-	output: 'shapeit/trio.chr{chromosome,[0-9]+}.haps', 'shapeit/trio.chr{chromosome,[0-9]+}.sample' 
-	log: 'shapeit/trio.chr{chromosome,[0-9]+}.run.log'
-	message: 'Running SHAPEIT on chromosome {wildcards.chromosome}'
-	shell: '{shapeit} -V {input.vcf} --exclude-snp {input.exclude} -M {input.genmap} --input-ref {input.refhaps} {input.legend} {input.refsamples} -O shapeit/trio.chr{wildcards.chromosome} > {log} 2>&1'
-
-
-rule shapeit_convert_to_vcf:
-	input:
-		haps='shapeit/trio.chr{chromosome,[0-9]+}.haps',
-		shapeit=shapeit,
-	output:
-		vcf='shapeit/trio.chr{chromosome,[0-9]+}.phased.vcf'
-	log: 'shapeit/trio.chr{chromosome,[0-9]+}.phased.vcf.log'
-	message: 'Converting SHAPEIT output for chromosome {wildcards.chromosome} to VCF'
-	shell: '{shapeit} -convert --input-haps shapeit/trio.chr{wildcards.chromosome} --output-vcf {output.vcf} > {log} 2>&1'
-
-
-rule split_shapeit_vcf:
-	input: 'shapeit/trio.chr{chromosome,[0-9]+}.phased.vcf'
-	output: 'vcf/ashk.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.phased.vcf'
-	log: 'vcf/ashk.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.phased.vcf.log'
-	run:
-		sample = role_to_sampleid[wildcards.individual]
-		shell('vcf-subset -c {sample} {input} > {output} 2> {log}')
-
-
-rule new_genetic_map:
-	input: 'download/1000GP_Phase3/genetic_map_chr{chromosome,[0-9]+}_combined_b37.txt'
-	output: 'genmap/scaled-{factor,[0-9]+}/genetic_map_chr{chromosome,[0-9]+}.txt'
-	message: 'Multiplying genetic distances by {wildcards.factor}'
-	shell: 'awk \'NR==1 {{print}} NR>1 {{print $1, $2*{wildcards.factor}, $3*{wildcards.factor} }}\' {input} > {output}'
-
-
-## Create the VCF file for the "virtual child"
-
-rule copy_sim_father_mother:
-	input: 'vcf/ashk.{individual,(mother|father)}.chr{chromosome,[0-9]+}.phased.vcf'
-	output: 'vcf/sim.{individual,(mother|father)}.chr{chromosome,[0-9]+}.phased.vcf'
-	shell: 'ln -fsrv {input} {output}'
-
-
-rule create_artificial_child:
-	input:
-		mothervcf='vcf/sim.mother.chr{chromosome,[0-9]+}.phased.vcf',
-		fathervcf='vcf/sim.father.chr{chromosome,[0-9]+}.phased.vcf',
-		genetic_map='genmap/scaled-10/genetic_map_chr{chromosome,[0-9]+}.txt'
-	output:
-		childvcf='vcf/sim.child.chr{chromosome,[0-9]+}.phased.vcf',
-		motherrecomb='sim/mother.chr{chromosome,[0-9]+}.true.recomb',
-		fatherrecomb='sim/father.chr{chromosome,[0-9]+}.true.recomb'
-	log: 'vcf/sim.child.chr{chromosome,[0-9]+}.phased.vcf.log'
-	message: 'Sampling artifical child'
-	run: 
-		sample = role_to_sampleid['child']
-		shell('{artificial_child} {input.genetic_map} {input.mothervcf} {input.fathervcf} {sample} {output.motherrecomb} {output.fatherrecomb} > {output.childvcf} 2>{log}')
-
-
-rule merge_artificial_trio:
-	input:
-		mothervcf='vcf/sim.mother.chr{chromosome,[0-9]+}.phased.vcf.gz',
-		mothervcftbi='vcf/sim.mother.chr{chromosome,[0-9]+}.phased.vcf.gz.tbi',
-		fathervcf='vcf/sim.father.chr{chromosome,[0-9]+}.phased.vcf.gz',
-		fathervcftbi='vcf/sim.father.chr{chromosome,[0-9]+}.phased.vcf.gz.tbi',
-		childvcf='vcf/sim.child.chr{chromosome,[0-9]+}.phased.vcf.gz',
-		childvcftbi='vcf/sim.child.chr{chromosome,[0-9]+}.phased.vcf.gz.tbi',
-	output:
-		vcf='vcf/sim.trio.chr{chromosome,[0-9]+}.phased.vcf',
-	log: 'vcf/sim.trio.chr{chromosome,[0-9]+}.phased.vcf.log'
-	shell:
-		"vcf-merge {input.mothervcf} {input.fathervcf} {input.childvcf} > {output.vcf} 2> {log}"
-
-
-rule sim_fastas:
-	input:
-		ref=reference,
-		vcf='vcf/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.phased.vcf',
-	output:
-		hap1='sim/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.haplotype1.true.fasta',
-		hap2='sim/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.haplotype2.true.fasta',
-	log: 'sim/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.true.log'
-	message: 'Creating true haplotypes {output}'
-	run:
-		sample = role_to_sampleid[wildcards.individual]
-		shell('mkdir -p sim/tmp')
-		shell('{genomesimulator} -c {wildcards.chromosome} {input.vcf} {input.ref} sim/tmp > {log} 2>&1')
-		shell('mv sim/tmp/{sample}.chr{wildcards.chromosome}.1.fasta {output.hap1}')
-		shell('mv sim/tmp/{sample}.chr{wildcards.chromosome}.2.fasta {output.hap2}')
-
-
-rule copy_gen_map_ashk:
-	input: 'download/1000GP_Phase3/genetic_map_chr{chromosome,[0-9]+}_combined_b37.txt'
-	output: 'genmap/ashk.chr{chromosome,[0-9]+}.map'
-	shell: 'ln -fsrv {input} {output}'
-
-
-rule copy_gen_map_sim:
-	input: 'genmap/scaled-10/genetic_map_chr{chromosome,[0-9]+}.txt'
-	output: 'genmap/sim.chr{chromosome,[0-9]+}.map'
-	shell: 'ln -fsrv {input} {output}'
-
-
-## Trio phasing rules are unused
-
-rule create_trio_ped:
-	output: 'trio.ped'
-	shell: 'echo family HG002 HG003 HG004 0 0 > {output}'
-
-
-rule trio_whatshap:
-	input:
-		ref=reference,
-		vcf='vcf/{dataset,[a-z]+}.trio.chr{chromosome}.unphased.vcf',
-		bamm='bam/{dataset,[a-z]+}.{platform,[a-z]+}.mother.chr{chromosome,[0-9]+}.cov{coverage,([0-9]+|all)}.bam',
-		bamf='bam/{dataset,[a-z]+}.{platform,[a-z]+}.father.chr{chromosome,[0-9]+}.cov{coverage,([0-9]+|all)}.bam',
-		bamc='bam/{dataset,[a-z]+}.{platform,[a-z]+}.child.chr{chromosome,[0-9]+}.cov{coverage,([0-9]+|all)}.bam',
-		genmap='genmap/{dataset,[a-z]+}.chr{chromosome,[0-9]+}.map',
-		ped='trio.ped'
-	output:
-		vcf='phased/whatshap/trio/{dataset,[a-z]+}.{platform,[a-z]+}.trio.chr{chromosome,[0-9]+}.cov{coverage,([0-9]+|all)}.vcf',
-		#recomb='whatshap/trio/{dataset,[a-z]+}.{platform,[a-z]+}.chr{chromosome,[0-9]+}.cov{coverage,([0-9]+|all)}.recomb',
-	log: 'phased/whatshap/trio/{dataset,[a-z]+}.{platform,[a-z]+}.chr{chromosome,[0-9]+}.cov{coverage,([0-9]+|all)}.log'
-	# TODO
-	# --recombination-list {output.recomb}
-	shell:
-		'{time} {whatshap} phase --reference {input.ref} --ped {input.ped} --genmap {input.genmap} --chromosome {wildcards.chromosome} -o {output.vcf} {input.vcf} {input.bamm} {input.bamf} {input.bamc} >& {log}'
-
-
-rule split_trio_vcf:
-	input:
-		vcf='phased/whatshap/trio/{dataset,[a-z]+}.{platform,[a-z]+}.trio.chr{chromosome,[0-9]+}.cov{coverage,([0-9]+|all)}.vcf'
-	output:
-		vcf='phased/whatshap/trio/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf'
-	log: 'phased/whatshap/trio/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.vcf.log'
-	run:
-		sample = role_to_sampleid[wildcards.individual]
-		shell('vcf-subset -c {sample} {input} > {output} 2> {log}')
-
-
-rule simulate_pacbio_reads:
-	output:
-		fastq='sim/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.haplotype{hap,[12]}.fastq.gz',
-		maf='sim/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.haplotype{hap,[12]}.maf.gz'
-	input:
-		sample='fastq/ashk.pacbio.{individual}.chr{chromosome}.cov2.fastq',
-		haplotype='sim/sim.{individual}.chr{chromosome}.haplotype{hap}.true.fasta'
-	log: 'sim/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.haplotype{hap,[12]}.fastq.log'
-	run:
-		coverage = 30
-		halfcoverage = coverage / 2
-		seed = abs(hash(output.fastq))
-		shell('mkdir -p sim/tmp')
-		shell('time (pbsim --seed {seed} --prefix sim/tmp/sim.{wildcards.individual}.chr{wildcards.chromosome}.haplotype{wildcards.hap} --depth {halfcoverage} --sample-fastq {input.sample} {input.haplotype}) > {log} 2>&1')
-		shell('awk \'NR%4==1 {{printf("%s_HAP{wildcards.hap}\\n",$0)}} NR%4!=1 {{print}}\' sim/tmp/sim.{wildcards.individual}.chr{wildcards.chromosome}.haplotype{wildcards.hap}_0001.fastq | {gzip} > {output.fastq}')
-		shell('cat sim/tmp/sim.{wildcards.individual}.chr{wildcards.chromosome}.haplotype{wildcards.hap}_0001.maf | {gzip} > {output.maf}')
-		shell('rm -f sim/tmp/sim.{wildcards.individual}.chr{wildcards.chromosome}.haplotype{wildcards.hap}_*')
 
 
 rule bwa_mem_single_end_pacbio:
