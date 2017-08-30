@@ -1,5 +1,12 @@
 # kate: syntax Python; space-indent off; indent-mode python; indent-width 4;
 """
+data
+ONT: 
+ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/reference/GRCh38_reference_genome/
+https://github.com/nanopore-wgs-consortium/NA12878
+
+PacBio : https://downloads.pacbcloud.com/public/dataset/na12878/
+ 
 How to re-run this workflow
 ---------------------------
 
@@ -11,8 +18,12 @@ Install dependencies:
 - copy human reference and BWA index into reference/ if you already have it
   (downloaded and generated otherwise)
 
-sudo docker build -t whatshap-experiments docker
-sudo docker run -it -v $PWD:/io/ whatshap-experiments snakemake -np
+cd docker
+sudo docker build -t whatshap-experiments .
+
+docker run -it -v $PWD:/io/ whatshap-experiments snakemake -np
+
+
 """
 
 import pysam
@@ -22,11 +33,13 @@ picard_tmpdir_switch = ''
 if 'TMPDIR' in os.environ:
 	picard_tmpdir_switch = 'TMP_DIR=%s' % os.environ['TMPDIR']
 
-datasets = ['ashk', 'sim']
+datasets = ['ceph']
 individuals = ['child']  #['mother', 'father', 'child']
 coverage = [2, 3, 4, 5, 10, 15, 'all']
+platform = ['oxford', 'pacbio']
+platform_to_ref = {'pacbio': 'reference/hg38.chr1.fa', 'oxford': 'reference/GRCh38_full_analysis_set_plus_decoy_hla.chr1.fa'}
 reference = 'reference/human_g1k_v37.fasta'
-role_to_sampleid = {'mother':'HG004', 'father':'HG003', 'child':'HG002' }
+role_to_sampleid = {'child':'NA12878'}
 
 time = "/usr/bin/time -f '%M kB; real %e; user %U; sys %S'"
 
@@ -104,7 +117,7 @@ rule gatk_missing:
 		exit 1
 		"""
 
-
+#TODO: update link to point to new dataset
 rule download_ashkenazim:
 	threads: 100
 	output:
@@ -113,6 +126,7 @@ rule download_ashkenazim:
 		"wget -O {output} ftp://ftp-trace.ncbi.nlm.nih.gov/giab/ftp/data/AshkenazimTrio/{wildcards.file}.{wildcards.ext}"
 
 
+#TODO: update link to point to new dataset
 rule download_reference:
 	output:
 		'reference/human_g1k_v37.fasta'
@@ -129,7 +143,7 @@ rule download_reference:
 
 ## Downsample BAM files, add read group information, etc.
 
-
+#TODO: update link to point to new dataset
 def ashkenazim_trio_bam(wildcards):
 	individual = {
 		'mother': dict(name='mother', id='4', na='24143'),
@@ -141,7 +155,7 @@ def ashkenazim_trio_bam(wildcards):
 	return 'download/AshkenazimTrio/HG00{id}_NA{na}_{name}/PacBio_MtSinai_NIST/MtSinai_'\
 			'blasr_bam_GRCh37/hg00{id}_gr37_{chromosome}.{ext}'.format(**individual)
 
-
+#TODO: update link to point to new dataset
 rule create_ashk_pacbio_links:
 	input: ashkenazim_trio_bam
 	output: 'bam/incorrect-readgroup/ashk.pacbio.{individual}.chr{chromosome,[0-9]+}.covall.{ext,(bam|bam.bai)}'
@@ -156,7 +170,7 @@ rule calculate_coverage:
 		bam = pysam.Samfile(input[0])
 		length = None
 		for e in bam.header.get('SQ'):
-			if e['SN'] == wildcards.chromosome:
+			if e['SN'] == "chr"+ wildcards.chromosome:
 				length = e['LN']
 		assert length != None
 		shell("samtools depth {input} | awk '{{sum+=$3}} END {{ print sum/{length} }}' > {output}")
@@ -226,10 +240,10 @@ rule filter_vcfs:
 
 
 rule split_vcf:
-	input: 'vcf/ashk.trio.unphased.vcf'
-	output: 'vcf/ashk.trio.chr{chromosome,[0-9]+}.unphased.vcf'
+	input: 'vcf/NA12878.vcf'
+	output: 'vcf/ceph.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.phased.vcf'
 	message: 'Extracting chromosome {wildcards.chromosome} from {input}'
-	shell: """awk '/^#/ || ($1 == "{wildcards.chromosome}")' {input} > {output}"""
+	shell: """awk '/^#/ || ($1 == "chr{wildcards.chromosome}")' {input} > {output}"""
 
 
 #rule shapeit_create_ped:
@@ -280,7 +294,7 @@ rule shapeit:
 	message: 'Running SHAPEIT on chromosome {wildcards.chromosome}'
 	shell: '{shapeit} -V {input.vcf} --exclude-snp {input.exclude} -M {input.genmap} --input-ref {input.refhaps} {input.legend} {input.refsamples} -O shapeit/trio.chr{wildcards.chromosome} > {log} 2>&1'
 
-
+# We don't need rules about shapeit and trio because we decided to consider only real data for single individual.
 rule shapeit_convert_to_vcf:
 	input:
 		haps='shapeit/trio.chr{chromosome,[0-9]+}.haps',
@@ -457,7 +471,7 @@ rule merge_hap_bams:
 	message: 'Merging haplotype-specific BAM files to create {output.bam}'
 	shell: '{time} picard -Xmx8g MergeSamFiles {picard_tmpdir_switch} VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=50000 SORT_ORDER=coordinate CREATE_INDEX=true CREATE_MD5_FILE=true I={input.bam1} I={input.bam2} O={output.bam} >& {log}'
 
-
+################## we don't need until here.
 ## Rules for running the phasing tools.
 ## Some have more than one rule if pre- and/or postprocessing is needed
 
@@ -466,8 +480,8 @@ rule gatk_read_backed_phasing:
 		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
 		bai='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bai',
 		vcf='vcf/{dataset,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.unphased.vcf',
-		ref=reference,
-		dictfile=reference.replace('.fasta', '.dict'),
+		#ref=reference,
+		#dictfile=reference.replace('.fasta', '.dict'),
 		gatk_jar=gatk_jar
 	output:
 		vcf='phased/read-backed-phasing/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf',
@@ -476,9 +490,11 @@ rule gatk_read_backed_phasing:
 	threads: 1  # ReadBackedPhasing cannot run with more than one thread
 	run:
 		#input_line = ' '.join('-I ' + bam for bam in input.bams)
+		ref = platform_to_ref[wildcards.platform]
+		dictfile=platform_to_ref[wildcards.platform].replace('.fasta', '.dict')
 		shell(r"""
 		{time} java -jar {gatk_jar} -T ReadBackedPhasing \
-			-R {input.ref} \
+			-R {ref} \
 			-I {input.bam} \
 			-L {input.vcf} \
 			-V {input.vcf} \
@@ -516,7 +532,7 @@ rule extract_hairs:
 	output:
 		txt='hairs/{indelsornot,(indels|noindels)}/' + hapcut_out + '.txt'
 	input:
-		ref=reference,
+		#sref=reference,
 		bam='bam/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.bam',
 		bai='bam/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.bai',
 		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
@@ -524,7 +540,9 @@ rule extract_hairs:
 		'hairs/{indelsornot,(indels|noindels)}/' + hapcut_out + '.log'
 	run:
 		extra = ' --indels 1' if wildcards.indelsornot == 'indels' else ''
-		shell("{time} {extract_hairs} --ref {input.ref} {extra} --VCF {input.vcf} --bam {input.bam} --maxIS 600 > {output.txt} 2> {log}")
+		extra_quality = ' --noquality 10 ' if wildcards.platform == 'pacbio' else ''
+		ref = platform_to_ref[wildcards.platform]
+		shell("{time} {extract_hairs} --ref {ref} {extra} {extra_quality} --VCF {input.vcf} --bam {input.bam} --longreads 1 --maxIS 600 > {output.txt} 2> {log}")
 
 
 rule hapcut:
@@ -535,7 +553,7 @@ rule hapcut:
 		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
 	log: 'phased/hapcut/{indelsornot}/' + hapcut_out + '.phase.log'
 	shell:
-		"{time} {hapcut} --fragments {input.txt} --VCF {input.vcf} --output {output.txt} >& {log}"
+		"{time} {hapcut} --fragments {input.txt} --VCF {input.vcf} --longreads 1 --output {output.txt} >& {log}"
 
 
 # We use the extractHAIRS distributed with hapCUT as the one distributed with
@@ -549,7 +567,7 @@ rule hapcut2:
 		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
 	log: 'phased/hapcut2/{indelsornot}/' + hapcut_out + '.phase.log'
 	shell:
-		"{time} {hapcut2} --fragments {input.txt} --VCF {input.vcf} --output {output.txt} >& {log}"
+		"{time} {hapcut2} --fragments {input.txt} --VCF {input.vcf} --longreads 1 --output {output.txt} >& {log}"
 
 
 rule hapcut_to_vcf:
@@ -605,29 +623,33 @@ rule whatshap_norealign:
 
 rule whatshap_noindels:  # with re-alignment
 	input:
-		ref=reference,
+		#ref=platform_to_ref[platform],
 		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
-		vcf='vcf/{dataset,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.unphased.vcf'
+		vcf='vcf/{dataset,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome, (all|[0-9]+)}.unphased.vcf'
 	output:
 		vcf='phased/whatshap/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf',
 		log='phased/whatshap/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
-	shell: '{time} {whatshap} phase --reference {input.ref} {input.vcf} {input.bam} > {output.vcf} 2> {output.log}'
+	run: 
+		ref = platform_to_ref[wildcards.platform]
+		shell('{time} {whatshap} phase --reference {ref} {input.vcf} {input.bam} > {output.vcf} 2> {output.log}')
 
 
 rule whatshap_indels:  # with re-alignment
 	input:
-		ref=reference,
+		#ref=platform_to_ref[platform],
 		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
-		vcf='vcf/{dataset,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.unphased.vcf'
+		vcf='vcf/{dataset,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome, (all|[0-9]+)}.unphased.vcf'
 	output:
 		vcf='phased/whatshap/indels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf',
 		log='phased/whatshap/indels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
-	shell: '{time} {whatshap} phase --indels --reference {input.ref} {input.vcf} {input.bam} > {output.vcf} 2> {output.log}'
+	run:
+		ref = platform_to_ref[wildcards.platform]
+		shell('{time} {whatshap} phase --indels --reference {ref} {input.vcf} {input.bam} > {output.vcf} 2> {output.log}')
 
 
 ## Evaluation: compare phasing results to ground truth, get VCF statistics
 
-
+#TODO: did not update evaluation and further rules.
 rule evaluate_phasing_tool:
 	input:
 		truth='vcf/{dataset}.{individual}.chr{chromosome}.phased.vcf',
