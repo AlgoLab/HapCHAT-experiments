@@ -24,19 +24,14 @@ picard_tmpdir_switch = ''
 if 'TMPDIR' in os.environ:
 	picard_tmpdir_switch = 'TMP_DIR=%s' % os.environ['TMPDIR']
 
-datasets = ['ashk', 'sim']
-individuals = ['child']
+datasets = ['pacbio', 'ont']
 coverage = [2, 3, 4, 5, 10, 15, 'all']
 reference = 'reference/GRCh38_full_analysis_set_plus_decoy_hla.fa'
-role_to_sampleid = {'mother':'HG004', 'father':'HG003', 'child':'HG002' }
 
 time = "/usr/bin/time -f '%M kB; real %e; user %U; sys %S'"
 
 # Paths to scripts distributed along with the Snakefile
 eval_plot = srcdir('scripts/evalplot.py')
-vcf_merge_trio = srcdir('scripts/vcf_merge_trio.pl')
-genomesimulator = srcdir('scripts/genomesimulator.py')
-artificial_child = srcdir('scripts/artificial-child.py')
 
 # Tools assumed to be installed somewhere on the PATH.
 phaser = 'phaser'
@@ -46,12 +41,14 @@ extract_hairs2 = 'extractHAIRS2'  # this is the extractHAIRS that comes with hap
 hapcut2 = 'HAPCUT2'
 whatshap = 'whatshap'
 
-ALGORITHMS = [
+PROGRAMS = [
 	'hapcut/indels',
 	'hapcut/noindels',
 	'hapcut2/indels',
 	'hapcut2/noindels',
 	'read-backed-phasing/noindels',
+	'phaser/indels',
+	'phaser/noindels',
 	'whatshap-norealign/noindels',
 	'whatshap/noindels',
 	'whatshap/indels',
@@ -61,10 +58,7 @@ ALGORITHMS = [
 # the Snakefile due to licensing restrictions
 gatk_jar = 'restricted-software/GenomeAnalysisTK.jar'
 
-# hapcompass is unused
-hapcompass = 'java -Xmx220g -jar .../hapcompass-0.8.1.jar'
-
-dataset_pattern = '{dataset,[a-z]+}.{platform,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}'
+dataset_pattern = '{dataset,[a-z]+}.chr{chromosome,[0-9]+}'
 
 
 rule master:
@@ -77,7 +71,7 @@ rule master:
 rule clean:
 	shell:
 		# download/ not included
-		"rm -rf bam/ fastq/ stats/ vcf/ phased/ eval/ hairs/"
+		"rm -rf bam/ stats/ vcf/ phased/ eval/ hairs/"
 
 
 ## Rules for external dependencies: Software and data files
@@ -134,12 +128,13 @@ rule download_platinum:
 rule download_pacbio:
 	output:
 		'pacbio/hg38.NA12878-WashU.chr1.bam'
+	threads: 4
 	shell:
 		# The conda samtools packages do not support HTTPS URLs, so use the
 		# system samtools if it is available
 		"""
 		if test -x /usr/bin/samtools; then SAMTOOLS=/usr/bin/samtools; else SAMTOOLS=samtools; fi
-		$SAMTOOLS view -b https://downloads.pacbcloud.com/public/dataset/na12878/hg38.NA12878-WashU.bam chr1 > {output}
+		$SAMTOOLS view -@ 4 -b https://downloads.pacbcloud.com/public/dataset/na12878/hg38.NA12878-WashU.bam chr1 > {output}
 		# TODO will MD5SUM always be the same?
 		"""
 
@@ -152,6 +147,20 @@ rule download_nanopore:
 		wget -O {output}.incomplete http://s3.amazonaws.com/nanopore-human-wgs/chr1.sorted.bam
 		mv {output}.incomplete {output}
 		cd nanopore && md5sum -c MD5SUM
+		"""
+
+
+rule symlink_bam:
+	output:
+		pacbio='bam/pacbio.chr1.covall.bam',
+		ont='bam/ont.chr1.covall.bam'
+	input:
+		pacbio='pacbio/hg38.NA12878-WashU.chr1.bam',
+		ont='nanopore/chr1.sorted.bam'
+	shell:
+		"""
+		ln -srf {input.pacbio} {output.pacbio}
+		ln -srf {input.ont} {output.ont}
 		"""
 
 
@@ -185,61 +194,10 @@ rule downsample:
 		shell('picard DownsampleSam INPUT={input.bam} RANDOM_SEED={seed} CREATE_INDEX=true OUTPUT={output.bam} PROBABILITY={p} VALIDATION_STRINGENCY=SILENT > {log} 2>&1')
 
 
-rule add_read_groups:
-	"""Add RG, prepend sample names to read names, strip unused tags"""
-	input: 'bam/incorrect-readgroup/ashk.{platform,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.cov{coverage,([0-9]+|all)}.bam'
-	output: 
-		bam='bam/ashk.{platform,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.cov{coverage,([0-9]+|all)}.bam',
-		bai='bam/ashk.{platform,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.cov{coverage,([0-9]+|all)}.bai'
-	log: 'bam/ashk.{platform,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.cov{coverage,([0-9]+|all)}.readgroup.log'
-	run: 
-		sample = role_to_sampleid[wildcards.individual]
-		shell(textwrap.dedent(
-			"""
-			( samtools view -h {input} | \\
-				sed '/^[^@]/ s|^|{wildcards.individual}_|g' | \\
-				sed -re 's_\\t(dq|dt|ip|iq|st|sq|mq):Z:[^\\t]*__g' | \\
-				samtools view -u - | \\
-				picard AddOrReplaceReadGroups {picard_tmpdir_switch} CREATE_INDEX=true VALIDATION_STRINGENCY=LENIENT I=/dev/stdin O={output.bam} ID={wildcards.individual} LB=UNKNOWN PL=PACBIO PU=UNKNOWN SM={sample}) > {log} 2>&1
-			"""))
-
-
-rule bam_to_fastq:
-	input: 'bam/{file}.bam'
-	output: 'fastq/{file}.fastq'
-	shell: 'bedtools bamtofastq -i {input} -fq {output}'
-
-
 rule unphase:
 	input: '{base}.phased.vcf'
 	output: '{base}.unphased.vcf'
 	shell: '{whatshap} unphase {input} > {output}'
-
-
-rule bwa_mem_single_end_pacbio:
-	input: 
-		fastq='sim/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.haplotype{hap,[12]}.fastq.gz',
-		ref=reference,
-		indexed=reference + '.bwt'
-	output: 'sim/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.haplotype{hap,[12]}.bam'
-	log: 'sim/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.haplotype{hap,[12]}.bam.log'
-	threads: 16
-	run:
-		sample = role_to_sampleid[wildcards.individual]
-		shell('{time} bwa mem -x pacbio -t {threads} {input.ref} {input.fastq} | samtools view -u - | picard AddOrReplaceReadGroups {picard_tmpdir_switch} VALIDATION_STRINGENCY=LENIENT I=/dev/stdin O={output} ID={wildcards.individual}{wildcards.hap} LB=UNKNOWN PL=PACBIO PU=UNKNOWN SM={sample} 2> {log}')
-
-
-rule merge_hap_bams:
-	input:
-		bam1='sim/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.haplotype1.bam',
-		bam2='sim/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.haplotype2.bam'
-	output: 
-		bam='bam/sim.pacbio.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.covall.bam',
-		bai='bam/sim.pacbio.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.covall.bai'
-	log: 'bam/sim.pacbio.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.covall.bam.log'
-	priority: 5
-	message: 'Merging haplotype-specific BAM files to create {output.bam}'
-	shell: '{time} picard -Xmx8g MergeSamFiles {picard_tmpdir_switch} VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=50000 SORT_ORDER=coordinate CREATE_INDEX=true CREATE_MD5_FILE=true I={input.bam1} I={input.bam2} O={output.bam} >& {log}'
 
 
 ## Rules for running the phasing tools.
@@ -249,7 +207,7 @@ rule gatk_read_backed_phasing:
 	input:
 		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
 		bai='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bai',
-		vcf='vcf/{dataset,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.unphased.vcf',
+		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf',
 		ref=reference,
 		dictfile=reference.replace('.fasta', '.dict'),
 		gatk_jar=gatk_jar
@@ -270,30 +228,8 @@ rule gatk_read_backed_phasing:
 			-o {output.vcf} >& {log}""")
 
 
-# The hapcompass rule is unused because the tool runs out of memory (tried 200GB)
-hapcompass_out = 'hapcompass/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}'
+hapcut_out = dataset_pattern + '.cov{coverage,([0-9]+|all)}'
 
-rule hapcompass:
-	output:
-		solution=hapcompass_out + '_MWER_solution.txt',
-		frags=temp(hapcompass_out + '_frags.txt'),
-		phsolution=temp(hapcompass_out + '_phasedSolution.txt'),
-		reads_sam=temp(hapcompass_out + '_reads.sam'),
-		rrsam=temp(hapcompass_out + '_reduced_representation.sam'),
-		rrvcf=temp(hapcompass_out + '_reduced_representation.vcf'),
-	params:
-		prefix=hapcompass_out
-	log:
-		hapcompass_out + '.log'
-	input:
-		bam='bam/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.bam',
-		bai='bam/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.bai',
-		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
-	shell:
-		"""{time} {hapcompass} --bam {input.bam} --vcf {input.vcf} -o {params.prefix} >& {log}"""
-
-
-hapcut_out = '' + dataset_pattern + '.cov{coverage,([0-9]+|all)}'
 
 rule extract_hairs:
 	"""hapCUT-specific pre-processing"""
@@ -301,9 +237,9 @@ rule extract_hairs:
 		txt='hairs/{indelsornot,(indels|noindels)}/' + hapcut_out + '.txt'
 	input:
 		ref=reference,
-		bam='bam/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.bam',
-		bai='bam/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.bai',
-		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
+		bam='bam/{dataset}.chr{chromosome}.cov{coverage}.bam',
+		bai='bam/{dataset}.chr{chromosome}.cov{coverage}.bai',
+		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf'
 	log:
 		'hairs/{indelsornot,(indels|noindels)}/' + hapcut_out + '.log'
 	run:
@@ -316,7 +252,7 @@ rule hapcut:
 		txt='phased/hapcut/{indelsornot,(indels|noindels)}/' + hapcut_out + '.txt'
 	input:
 		txt='hairs/{indelsornot}/' + hapcut_out + '.txt',
-		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
+		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf'
 	log: 'phased/hapcut/{indelsornot}/' + hapcut_out + '.phase.log'
 	shell:
 		"{time} {hapcut} --fragments {input.txt} --VCF {input.vcf} --output {output.txt} >& {log}"
@@ -330,7 +266,7 @@ rule hapcut2:
 		txt='phased/hapcut2/{indelsornot,(indels|noindels)}/' + hapcut_out + '.txt'
 	input:
 		txt='hairs/{indelsornot}/' + hapcut_out + '.txt',
-		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
+		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf',
 	log: 'phased/hapcut2/{indelsornot}/' + hapcut_out + '.phase.log'
 	shell:
 		"{time} {hapcut2} --fragments {input.txt} --VCF {input.vcf} --output {output.txt} >& {log}"
@@ -340,7 +276,7 @@ rule hapcut_to_vcf:
 	output:
 		vcf='phased/hapcut/{indelsornot,(indels|noindels)}/' + hapcut_out + '.vcf'
 	input:
-		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
+		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf',
 		hapcut='phased/hapcut/{indelsornot}/' + hapcut_out + '.txt'
 	log: 'phased/hapcut/{indelsornot}/' + hapcut_out + '.vcf.log'
 	shell:
@@ -351,7 +287,7 @@ rule hapcut2_to_vcf:
 	output:
 		vcf='phased/hapcut2/{indelsornot,(indels|noindels)}/' + hapcut_out + '.vcf'
 	input:
-		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf',
+		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf',
 		hapcut='phased/hapcut2/{indelsornot}/' + hapcut_out + '.txt'
 	log: 'phased/hapcut2/{indelsornot}/' + hapcut_out + '.vcf.log'
 	shell:
@@ -364,15 +300,15 @@ rule phaser:
 	params:
 		base='phased/phaser/{indelsornot}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}'
 	input:
-		bam='bam/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.bam',
-		bai='bam/{dataset}.{platform}.{individual}.chr{chromosome}.cov{coverage}.bai',
-		vcf='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf.gz',
-		tbi='vcf/{dataset}.{individual}.chr{chromosome}.unphased.vcf.gz.tbi',
+		bam='bam/{dataset}.chr{chromosome}.cov{coverage}.bam',
+		bai='bam/{dataset}.chr{chromosome}.cov{coverage}.bai',
+		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf.gz',
+		tbi='vcf/unphased.chr{chromosome,[0-9]+}.vcf.gz.tbi',
 	log:
 		'phased/phaser/{indelsornot}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
 	run:
 		extra = ' --include_indels 1' if wildcards.indelsornot == 'indels' else ' --include_indels 0'
-		sample = role_to_sampleid[wildcards.individual]
+		sample = 'NA12878'
 		shell("{time} {phaser}{extra} --bam {input.bam} --write_vcf 1 --gw_phase_vcf 2 --pass_only 0 --vcf {input.vcf} --sample {sample} --mapq 1 --baseq 1 --paired_end 0 --o {params.base} >& {log}")
 		shell("gunzip -f {params.base}.vcf.gz")
 		#shell(r"sed -i.orig '/^#/!s|\bGT:PG:|PG:GT:|;/^#/!s|:PI:|:PS:|' {params.base}.vcf")
@@ -381,7 +317,7 @@ rule phaser:
 rule whatshap_norealign:
 	input:
 		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
-		vcf='vcf/{dataset,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.unphased.vcf'
+		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf',
 	output: 'phased/whatshap-norealign/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf'
 	log: 'phased/whatshap-norealign/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
 	shell: '{time} {whatshap} phase {input.vcf} {input.bam} > {output} 2> {log}'
@@ -391,7 +327,7 @@ rule whatshap_noindels:  # with re-alignment
 	input:
 		ref=reference,
 		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
-		vcf='vcf/{dataset,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.unphased.vcf'
+		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf',
 	output:
 		vcf='phased/whatshap/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf',
 		log='phased/whatshap/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
@@ -402,7 +338,7 @@ rule whatshap_indels:  # with re-alignment
 	input:
 		ref=reference,
 		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
-		vcf='vcf/{dataset,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.unphased.vcf'
+		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf',
 	output:
 		vcf='phased/whatshap/indels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf',
 		log='phased/whatshap/indels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
@@ -414,7 +350,7 @@ rule whatshap_indels:  # with re-alignment
 
 rule evaluate_phasing_tool:
 	input:
-		truth='vcf/{dataset}.{individual}.chr{chromosome}.phased.vcf',
+		truth='vcf/truth.chr{chromosome}.vcf',
 		phased='phased/{program}/' + dataset_pattern + '.cov{coverage}.vcf'
 	output:
 		'eval/{program,(whatshap-norealign/noindels|whatshap/trio|whatshap/noindels|whatshap/indels|read-backed-phasing/noindels|hapcut/indels|hapcut/noindels|hapcut2/indels|hapcut2/noindels|phaser/indels|phaser/noindels)}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.eval'
@@ -453,22 +389,20 @@ rule connected_components:
 			if components is None:
 				sys.exit("WhatsHap log file missing line with 'Best-case phasing would result ...'")
 		with open(output.components, 'w') as f:
-			print('dataset', 'individual', 'indels', 'coverage', 'components', sep='\t', file=f)
+			print('dataset', 'indels', 'coverage', 'components', sep='\t', file=f)
 			indels = int(wildcards.indelsornot == 'indels')
-			print(wildcards.dataset, wildcards.individual, indels, wildcards.coverage, components, sep='\t', file=f)
+			print(wildcards.dataset, indels, wildcards.coverage, components, sep='\t', file=f)
 
 
 
 ## Create two tables with evaluation results
 
 def all_eval_paths(extension):
-	l1 = expand('eval/{program}/{dataset}.pacbio.{individual}.chr1.cov{coverage}' + extension,
-		program=ALGORITHMS,
-		dataset=datasets, individual=individuals, coverage=coverage),
-	l2 = expand('eval/phaser/{indels}/{dataset}.pacbio.{individual}.chr1.cov{coverage}' + extension,
-		indels=['indels', 'noindels'], dataset=datasets, individual=individuals, coverage=coverage)
+	l1 = expand('eval/{program}/{dataset}.chr1.cov{coverage}' + extension,
+		program=PROGRAMS,
+		dataset=datasets, coverage=coverage),
 	# Exclude because they did not finish within 24h
-	l2 = tuple(s for s in l2 if not ('/ashk.' in s and '.covall.' in s))
+	#l2 = tuple(s for s in l2 if not ('/ashk.' in s and '.covall.' in s))
 	return l1 + l2
 
 
@@ -493,8 +427,8 @@ rule summarize_connected_components:
 	output:
 		summary='eval/summary.components'
 	input:
-		components=expand('eval/components/{indels}/{dataset}.pacbio.{individual}.chr1.cov{coverage}.components',
-			indels=['indels', 'noindels'], dataset=datasets, individual=individuals, coverage=coverage)
+		components=expand('eval/components/{indels}/{dataset}.chr1.cov{coverage}.components',
+			indels=['indels', 'noindels'], dataset=datasets, coverage=coverage)
 	shell:
 		"""
 		(
