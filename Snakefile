@@ -165,7 +165,7 @@ rule symlink_bam:
 
 
 rule calculate_coverage:
-	input: 'bam/' + dataset_pattern + '.cov{coverage,(all|[0-9]+)}.bam'
+	input: 'bam/' + dataset_pattern + '.cov{coverage}.bam'
 	output: 'stats/bam/' + dataset_pattern + '.cov{coverage,(all|[0-9]+)}.coverage'
 	message: 'Computing coverage for {input}'
 	run: 
@@ -205,9 +205,9 @@ rule unphase:
 
 rule gatk_read_backed_phasing:
 	input:
-		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
-		bai='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bai',
-		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf',
+		bam='bam/' + dataset_pattern + '.cov{coverage}.bam',
+		bai='bam/' + dataset_pattern + '.cov{coverage}.bai',
+		vcf='vcf/unphased.chr{chromosome}.vcf',
 		ref=reference,
 		dictfile=reference.replace('.fasta', '.dict'),
 		gatk_jar=gatk_jar
@@ -239,7 +239,7 @@ rule extract_hairs:
 		ref=reference,
 		bam='bam/{dataset}.chr{chromosome}.cov{coverage}.bam',
 		bai='bam/{dataset}.chr{chromosome}.cov{coverage}.bai',
-		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf'
+		vcf='vcf/unphased.chr{chromosome}.vcf'
 	log:
 		'hairs/{indelsornot,(indels|noindels)}/' + hapcut_out + '.log'
 	run:
@@ -252,7 +252,7 @@ rule hapcut:
 		txt='phased/hapcut/{indelsornot,(indels|noindels)}/' + hapcut_out + '.txt'
 	input:
 		txt='hairs/{indelsornot}/' + hapcut_out + '.txt',
-		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf'
+		vcf='vcf/unphased.chr{chromosome}.vcf'
 	log: 'phased/hapcut/{indelsornot}/' + hapcut_out + '.phase.log'
 	shell:
 		"{time} {hapcut} --fragments {input.txt} --VCF {input.vcf} --output {output.txt} >& {log}"
@@ -266,7 +266,7 @@ rule hapcut2:
 		txt='phased/hapcut2/{indelsornot,(indels|noindels)}/' + hapcut_out + '.txt'
 	input:
 		txt='hairs/{indelsornot}/' + hapcut_out + '.txt',
-		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf',
+		vcf='vcf/unphased.chr{chromosome}.vcf',
 	log: 'phased/hapcut2/{indelsornot}/' + hapcut_out + '.phase.log'
 	shell:
 		"{time} {hapcut2} --fragments {input.txt} --VCF {input.vcf} --output {output.txt} >& {log}"
@@ -276,7 +276,7 @@ rule hapcut_to_vcf:
 	output:
 		vcf='phased/hapcut/{indelsornot,(indels|noindels)}/' + hapcut_out + '.vcf'
 	input:
-		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf',
+		vcf='vcf/unphased.chr{chromosome}.vcf',
 		hapcut='phased/hapcut/{indelsornot}/' + hapcut_out + '.txt'
 	log: 'phased/hapcut/{indelsornot}/' + hapcut_out + '.vcf.log'
 	shell:
@@ -287,7 +287,7 @@ rule hapcut2_to_vcf:
 	output:
 		vcf='phased/hapcut2/{indelsornot,(indels|noindels)}/' + hapcut_out + '.vcf'
 	input:
-		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf',
+		vcf='vcf/unphased.chr{chromosome}.vcf',
 		hapcut='phased/hapcut2/{indelsornot}/' + hapcut_out + '.txt'
 	log: 'phased/hapcut2/{indelsornot}/' + hapcut_out + '.vcf.log'
 	shell:
@@ -302,8 +302,8 @@ rule phaser:
 	input:
 		bam='bam/{dataset}.chr{chromosome}.cov{coverage}.bam',
 		bai='bam/{dataset}.chr{chromosome}.cov{coverage}.bai',
-		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf.gz',
-		tbi='vcf/unphased.chr{chromosome,[0-9]+}.vcf.gz.tbi',
+		vcf='vcf/unphased.chr{chromosome}.vcf.gz',
+		tbi='vcf/unphased.chr{chromosome}.vcf.gz.tbi',
 	log:
 		'phased/phaser/{indelsornot}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
 	run:
@@ -316,8 +316,8 @@ rule phaser:
 
 rule whatshap_norealign:
 	input:
-		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
-		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf',
+		bam='bam/' + dataset_pattern + '.cov{coverage}.bam',
+		vcf='vcf/unphased.chr{chromosome}.vcf',
 	output: 'phased/whatshap-norealign/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf'
 	log: 'phased/whatshap-norealign/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
 	shell: '{time} {whatshap} phase {input.vcf} {input.bam} > {output} 2> {log}'
@@ -326,8 +326,8 @@ rule whatshap_norealign:
 rule whatshap_noindels:  # with re-alignment
 	input:
 		ref=reference,
-		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
-		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf',
+		bam='bam/' + dataset_pattern + '.cov{coverage}.bam',
+		vcf='vcf/unphased.chr{chromosome}.vcf',
 	output:
 		vcf='phased/whatshap/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf',
 		log='phased/whatshap/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
@@ -337,8 +337,8 @@ rule whatshap_noindels:  # with re-alignment
 rule whatshap_indels:  # with re-alignment
 	input:
 		ref=reference,
-		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.bam',
-		vcf='vcf/unphased.chr{chromosome,[0-9]+}.vcf',
+		bam='bam/' + dataset_pattern + '.cov{coverage}.bam',
+		vcf='vcf/unphased.chr{chromosome}.vcf',
 	output:
 		vcf='phased/whatshap/indels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf',
 		log='phased/whatshap/indels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
