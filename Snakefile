@@ -172,9 +172,9 @@ rule calculate_coverage:
 		bam = pysam.Samfile(input[0])
 		length = None
 		for e in bam.header.get('SQ'):
-			if e['SN'] == wildcards.chromosome:
+			if e['SN'] == 'chr' + wildcards.chromosome:
 				length = e['LN']
-		assert length != None
+		assert length is not None
 		shell("samtools depth {input} | awk '{{sum+=$3}} END {{ print sum/{length} }}' > {output}")
 
 
@@ -195,8 +195,8 @@ rule downsample:
 
 
 rule unphase:
-	input: 'platinum/NA12878.vcf.gz'
-	output: 'vcf/unphased.chr1.vcf'
+	input: 'vcf/truth.chr{chromosome}.vcf'
+	output: 'vcf/unphased.chr{chromosome}.vcf'
 	shell: '{whatshap} unphase {input} > {output}'
 
 
@@ -351,7 +351,7 @@ rule make_truth:
 	input:
 		vcf='platinum/NA12878.vcf.gz',
 		tbi='platinum/NA12878.vcf.gz.tbi'
-	output: 'vcf/truth.chr{chromosome}.vcf'
+	output: 'vcf/truth.{chromosome}.vcf'
 	shell:
 		"bcftools view {input.vcf} {wildcards.chromosome} > {output}"
 
@@ -475,7 +475,7 @@ rule vcf_bgzip:
 rule samtools_index:
 	input: '{path}.covall.bam'
 	output: '{path}.covall.bai'
-	shell: 'samtools index -o {output} {input}'
+	shell: 'samtools index {input} {output}'
 
 
 #rule index_reference:
