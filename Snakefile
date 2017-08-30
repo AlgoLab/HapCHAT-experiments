@@ -348,10 +348,12 @@ rule whatshap_indels:  # with re-alignment
 ## Evaluation: compare phasing results to ground truth, get VCF statistics
 
 rule make_truth:
-	input: 'platinum/NA12878.vcf.gz'
+	input:
+		vcf='platinum/NA12878.vcf.gz',
+		tbi='platinum/NA12878.vcf.gz.tbi'
 	output: 'vcf/truth.chr{chromosome}.vcf'
 	shell:
-		""#TODO
+		"bcftools view {input.vcf} {wildcards.chromosome} > {output}"
 
 
 rule evaluate_phasing_tool:
