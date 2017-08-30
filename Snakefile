@@ -11,12 +11,14 @@ Install dependencies:
 - copy human reference and BWA index into reference/ if you already have it
   (downloaded and generated otherwise)
 
-sudo docker build -t whatshap-experiments docker
+sudo docker build -t whatshap-experiments docker/
 sudo docker run -it -v $PWD:/io/ whatshap-experiments snakemake -np
 """
 
 import pysam
 import textwrap
+
+shell.executable("/bin/bash")
 
 picard_tmpdir_switch = ''
 if 'TMPDIR' in os.environ:
