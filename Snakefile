@@ -59,7 +59,6 @@ ALGORITHMS = [
 
 # Software that must be installed manually prior to running
 # the Snakefile due to licensing restrictions
-shapeit = 'restricted-software/shapeit'
 gatk_jar = 'restricted-software/GenomeAnalysisTK.jar'
 
 # hapcompass is unused
@@ -78,7 +77,7 @@ rule master:
 rule clean:
 	shell:
 		# download/ not included
-		"rm -rf bam/ fastq/ genmap/ shapeit/ sim/ stats/ vcf/ phased/ eval/ hairs/"
+		"rm -rf bam/ fastq/ stats/ vcf/ phased/ eval/ hairs/"
 
 
 ## Rules for external dependencies: Software and data files
@@ -130,6 +129,14 @@ rule download_platinum:
 		mv {output}.incomplete {output}
 		cd platinum && md5sum -c MD5SUM
 		"""
+
+
+rule download_pacbio:
+	output:
+		'pacbio/hg38.NA12878-WashU.chr1.bam'
+	shell:
+		'samtools view -b https://downloads.pacbcloud.com/public/dataset/na12878/hg38.NA12878-WashU.bam chr1 > {output}'
+		# TODO will MD5SUM always be the same?
 
 
 rule download_nanopore:
