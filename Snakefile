@@ -27,7 +27,7 @@ if 'TMPDIR' in os.environ:
 datasets = ['ashk', 'sim']
 individuals = ['child']  #['mother', 'father', 'child']
 coverage = [2, 3, 4, 5, 10, 15, 'all']
-reference = 'reference/human_g1k_v37.fasta'
+reference = 'reference/GRCh38_full_analysis_set_plus_decoy_hla.fa'
 role_to_sampleid = {'mother':'HG004', 'father':'HG003', 'child':'HG002' }
 
 time = "/usr/bin/time -f '%M kB; real %e; user %U; sys %S'"
@@ -129,14 +129,11 @@ rule download_ashkenazim:
 
 rule download_reference:
 	output:
-		'reference/human_g1k_v37.fasta'
+		'reference/GRCh38_full_analysis_set_plus_decoy_hla.fa'
 	shell:
 		"""
-		wget -O {output}.gz.incomplete ftp://ftp.ncbi.nlm.nih.gov/1000genomes/ftp/technical/reference/human_g1k_v37.fasta.gz
-		mv {output}.gz.incomplete {output}.gz
-		# gunzip fails with "decompression OK, trailing garbage ignored" because
-		# the file is razf-compressed (gzip-compatible, but with an index at end)
-		gunzip -f {output}.gz || true
+		wget -O {output}.incomplete ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/reference/GRCh38_reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.fa
+		mv {output}.incomplete {output}
 		cd reference && md5sum -c MD5SUM
 		"""
 
