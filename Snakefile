@@ -120,14 +120,6 @@ rule gatk_missing:
 		"""
 
 
-rule download_ashkenazim:
-	threads: 100
-	output:
-		protected("download/AshkenazimTrio/{file}.{ext,(bam|bam.bai|vcf.gz)}")
-	shell:
-		"wget -O {output} ftp://ftp-trace.ncbi.nlm.nih.gov/giab/ftp/data/AshkenazimTrio/{wildcards.file}.{wildcards.ext}"
-
-
 rule references_ok:
 	output:
 		'reference/OK'
@@ -145,6 +137,17 @@ rule download_reference:
 		"""
 		wget -O {output}.incomplete ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/reference/GRCh38_reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.{wildcards.ext}
 		mv {output}.incomplete {output}
+		"""
+
+
+rule download_platinum:
+	output:
+		'platinum/NA12878.vcf.gz'
+	shell:
+		"""
+		wget --ftp-password= --ftp-user=platgene_ro -O {output}.incomplete ftp://ussd-ftp.illumina.com/2017-1.0/hg38/small_variants/NA12878/NA12878.vcf.gz
+		mv {output}.incomplete {output}
+		cd platinum && md5sum -c MD5SUM
 		"""
 
 
