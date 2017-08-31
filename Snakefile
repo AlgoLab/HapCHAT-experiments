@@ -257,7 +257,7 @@ rule hapcut:
 		vcf='vcf/unphased.chr{chromosome}.vcf'
 	log: 'phased/hapcut/{indelsornot}/' + hapcut_out + '.phase.log'
 	shell:
-		"{time} {hapcut} --fragments {input.txt} --VCF {input.vcf} --output {output.txt} >& {log}"
+		"{time} {hapcut} --longreads 1 --fragments {input.txt} --VCF {input.vcf} --output {output.txt} >& {log}"
 
 
 # We use the extractHAIRS distributed with hapCUT as the one distributed with
@@ -271,7 +271,7 @@ rule hapcut2:
 		vcf='vcf/unphased.chr{chromosome}.vcf',
 	log: 'phased/hapcut2/{indelsornot}/' + hapcut_out + '.phase.log'
 	shell:
-		"{time} {hapcut2} --fragments {input.txt} --VCF {input.vcf} --output {output.txt} >& {log}"
+		"{time} {hapcut2} --longreads 1 --fragments {input.txt} --VCF {input.vcf} --output {output.txt} >& {log}"
 
 
 rule hapcut_to_vcf:
