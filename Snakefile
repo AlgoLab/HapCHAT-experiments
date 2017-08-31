@@ -58,7 +58,8 @@ PROGRAMS = [
 # the Snakefile due to licensing restrictions
 gatk_jar = 'restricted-software/GenomeAnalysisTK.jar'
 
-dataset_pattern = '{dataset,[a-z]+}.chr{chromosome,[0-9]+}'
+dataset_pattern_in = '{dataset}.chr{chromosome}'
+dataset_pattern_out = '{dataset,[a-z]+}.chr{chromosome,[0-9]+}'
 
 
 rule master:
@@ -165,8 +166,8 @@ rule symlink_bam:
 
 
 rule calculate_coverage:
-	input: 'bam/' + dataset_pattern + '.cov{coverage}.bam'
-	output: 'stats/bam/' + dataset_pattern + '.cov{coverage,(all|[0-9]+)}.coverage'
+	input: 'bam/' + dataset_pattern_in + '.cov{coverage}.bam'
+	output: 'stats/bam/' + dataset_pattern_out + '.cov{coverage,(all|[0-9]+)}.coverage'
 	message: 'Computing coverage for {input}'
 	run: 
 		bam = pysam.Samfile(input[0])
@@ -180,12 +181,12 @@ rule calculate_coverage:
 
 rule downsample:
 	input:
-		bam='bam/' + dataset_pattern + '.covall.bam',
-		coverage='stats/bam/' + dataset_pattern + '.covall.coverage'
+		bam='bam/' + dataset_pattern_in + '.covall.bam',
+		coverage='stats/bam/' + dataset_pattern_in + '.covall.coverage'
 	output: 
-		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+)}.bam',
-		bai='bam/' + dataset_pattern + '.cov{coverage,([0-9]+)}.bai'
-	log: 'bam/' + dataset_pattern + '.cov{coverage,([0-9]+)}.log'
+		bam='bam/' + dataset_pattern_out + '.cov{coverage,([0-9]+)}.bam',
+		bai='bam/' + dataset_pattern_out + '.cov{coverage,([0-9]+)}.bai'
+	log: 'bam/' + dataset_pattern_out + '.cov{coverage,([0-9]+)}.log'
 	message: 'Downsampling {input.bam} to {wildcards.coverage}x'
 	run:
 		input_coverage = float(open(input.coverage).readline())
@@ -205,15 +206,15 @@ rule unphase:
 
 rule gatk_read_backed_phasing:
 	input:
-		bam='bam/' + dataset_pattern + '.cov{coverage}.bam',
-		bai='bam/' + dataset_pattern + '.cov{coverage}.bai',
+		bam='bam/' + dataset_pattern_in + '.cov{coverage}.bam',
+		bai='bam/' + dataset_pattern_in + '.cov{coverage}.bai',
 		vcf='vcf/unphased.chr{chromosome}.vcf',
 		ref=reference,
 		dictfile=reference.replace('.fasta', '.dict'),
 		gatk_jar=gatk_jar
 	output:
-		vcf='phased/read-backed-phasing/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf',
-	log: 'phased/read-backed-phasing/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
+		vcf='phased/read-backed-phasing/noindels/' + dataset_pattern_out + '.cov{coverage,([0-9]+|all)}.vcf',
+	log: 'phased/read-backed-phasing/noindels/' + dataset_pattern_out + '.cov{coverage,([0-9]+|all)}.log'
 	message: 'Running GATK\'s ReadBackedPhasing on {input.bam}'
 	threads: 1  # ReadBackedPhasing cannot run with more than one thread
 	run:
@@ -228,7 +229,8 @@ rule gatk_read_backed_phasing:
 			-o {output.vcf} >& {log}""")
 
 
-hapcut_out = dataset_pattern + '.cov{coverage,([0-9]+|all)}'
+hapcut_out = dataset_pattern_out + '.cov{coverage,([0-9]+|all)}'
+hapcut_in = dataset_pattern_in + '.cov{coverage}'
 
 
 rule extract_hairs:
@@ -251,7 +253,7 @@ rule hapcut:
 	output:
 		txt='phased/hapcut/{indelsornot,(indels|noindels)}/' + hapcut_out + '.txt'
 	input:
-		txt='hairs/{indelsornot}/' + hapcut_out + '.txt',
+		txt='hairs/{indelsornot}/' + hapcut_in + '.txt',
 		vcf='vcf/unphased.chr{chromosome}.vcf'
 	log: 'phased/hapcut/{indelsornot}/' + hapcut_out + '.phase.log'
 	shell:
@@ -296,16 +298,16 @@ rule hapcut2_to_vcf:
 
 rule phaser:
 	output:
-		vcf='phased/phaser/{indelsornot,(indels|noindels)}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf'
+		vcf='phased/phaser/{indelsornot,(indels|noindels)}/' + dataset_pattern_out + '.cov{coverage,([0-9]+|all)}.vcf'
 	params:
-		base='phased/phaser/{indelsornot}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}'
+		base='phased/phaser/{indelsornot}/' + dataset_pattern_in + '.cov{coverage}'
 	input:
 		bam='bam/{dataset}.chr{chromosome}.cov{coverage}.bam',
 		bai='bam/{dataset}.chr{chromosome}.cov{coverage}.bai',
 		vcf='vcf/unphased.chr{chromosome}.vcf.gz',
 		tbi='vcf/unphased.chr{chromosome}.vcf.gz.tbi',
 	log:
-		'phased/phaser/{indelsornot}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
+		'phased/phaser/{indelsornot}/' + dataset_pattern_out + '.cov{coverage,([0-9]+|all)}.log'
 	run:
 		extra = ' --include_indels 1' if wildcards.indelsornot == 'indels' else ' --include_indels 0'
 		sample = 'NA12878'
@@ -316,32 +318,32 @@ rule phaser:
 
 rule whatshap_norealign:
 	input:
-		bam='bam/' + dataset_pattern + '.cov{coverage}.bam',
+		bam='bam/' + dataset_pattern_in + '.cov{coverage}.bam',
 		vcf='vcf/unphased.chr{chromosome}.vcf',
-	output: 'phased/whatshap-norealign/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf'
-	log: 'phased/whatshap-norealign/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
+	output: 'phased/whatshap-norealign/noindels/' + dataset_pattern_out + '.cov{coverage,([0-9]+|all)}.vcf'
+	log: 'phased/whatshap-norealign/noindels/' + dataset_pattern_out + '.cov{coverage,([0-9]+|all)}.log'
 	shell: '{time} {whatshap} phase {input.vcf} {input.bam} > {output} 2> {log}'
 
 
 rule whatshap_noindels:  # with re-alignment
 	input:
 		ref=reference,
-		bam='bam/' + dataset_pattern + '.cov{coverage}.bam',
+		bam='bam/' + dataset_pattern_in + '.cov{coverage}.bam',
 		vcf='vcf/unphased.chr{chromosome}.vcf',
 	output:
-		vcf='phased/whatshap/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf',
-		log='phased/whatshap/noindels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
+		vcf='phased/whatshap/noindels/' + dataset_pattern_out + '.cov{coverage,([0-9]+|all)}.vcf',
+		log='phased/whatshap/noindels/' + dataset_pattern_out + '.cov{coverage,([0-9]+|all)}.log'
 	shell: '{time} {whatshap} phase --reference {input.ref} {input.vcf} {input.bam} > {output.vcf} 2> {output.log}'
 
 
 rule whatshap_indels:  # with re-alignment
 	input:
 		ref=reference,
-		bam='bam/' + dataset_pattern + '.cov{coverage}.bam',
+		bam='bam/' + dataset_pattern_in + '.cov{coverage}.bam',
 		vcf='vcf/unphased.chr{chromosome}.vcf',
 	output:
-		vcf='phased/whatshap/indels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.vcf',
-		log='phased/whatshap/indels/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
+		vcf='phased/whatshap/indels/' + dataset_pattern_out + '.cov{coverage,([0-9]+|all)}.vcf',
+		log='phased/whatshap/indels/' + dataset_pattern_out + '.cov{coverage,([0-9]+|all)}.log'
 	shell: '{time} {whatshap} phase --indels --reference {input.ref} {input.vcf} {input.bam} > {output.vcf} 2> {output.log}'
 
 
@@ -359,22 +361,22 @@ rule make_truth:
 rule evaluate_phasing_tool:
 	input:
 		truth='vcf/truth.chr{chromosome}.vcf',
-		phased='phased/{program}/' + dataset_pattern + '.cov{coverage}.vcf'
+		phased='phased/{program}/' + dataset_pattern_in + '.cov{coverage}.vcf'
 	output:
-		'eval/{program,(whatshap-norealign/noindels|whatshap/trio|whatshap/noindels|whatshap/indels|read-backed-phasing/noindels|hapcut/indels|hapcut/noindels|hapcut2/indels|hapcut2/noindels|phaser/indels|phaser/noindels)}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.eval'
+		'eval/{program,(whatshap-norealign/noindels|whatshap/trio|whatshap/noindels|whatshap/indels|read-backed-phasing/noindels|hapcut/indels|hapcut/noindels|hapcut2/indels|hapcut2/noindels|phaser/indels|phaser/noindels)}/' + dataset_pattern_out + '.cov{coverage,([0-9]+|all)}.eval'
 	log:
-		'eval/{program}/' + dataset_pattern + '.cov{coverage,([0-9]+|all)}.log'
+		'eval/{program}/' + dataset_pattern_out + '.cov{coverage,([0-9]+|all)}.log'
 	shell:
 		'{whatshap} compare --names truth,{wildcards.program} --tsv-pairwise {output} {input.truth} {input.phased} 2>&1 > {log}'
 
 
 rule whatshap_stats:
 	output:
-		stats='eval/{program}/' + dataset_pattern + '.cov{coverage}.stats'
+		stats='eval/{program}/' + dataset_pattern_out + '.cov{coverage}.stats'
 	input:
-		vcf='phased/{program}/' + dataset_pattern + '.cov{coverage}.vcf'
+		vcf='phased/{program}/' + dataset_pattern_in + '.cov{coverage}.vcf'
 	log:
-		'eval/{program}/' + dataset_pattern + '.cov{coverage}.statslog'
+		'eval/{program}/' + dataset_pattern_out + '.cov{coverage}.statslog'
 	shell:
 		'{whatshap} stats --tsv {output.stats} {input.vcf} &> {log}'
 
@@ -382,9 +384,9 @@ rule whatshap_stats:
 rule connected_components:
 	# Extract the number of connected components from WhatsHap log output
 	output:
-		components='eval/components/{indelsornot,(indels|noindels)}/' + dataset_pattern + '.cov{coverage}.components'
+		components='eval/components/{indelsornot,(indels|noindels)}/' + dataset_pattern_out + '.cov{coverage}.components'
 	input:
-		whatshap_log='phased/whatshap/{indelsornot}/' + dataset_pattern + '.cov{coverage}.log'
+		whatshap_log='phased/whatshap/{indelsornot}/' + dataset_pattern_in + '.cov{coverage}.log'
 	run:
 		r = re.compile(r'Best-case phasing would result in [0-9]+ non-singleton phased blocks \((?P<blocks>[0-9]+) in total\).*')
 		with open(input.whatshap_log) as f:
