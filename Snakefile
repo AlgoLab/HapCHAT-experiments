@@ -61,6 +61,10 @@ rule input_only :
 	input :
 		expand('stats/bam/{dataset}.pacbio.child.chr{chromosome}.cov15.coverage',
 			dataset = datasets,
+			chromosome = chromosomes),
+
+		expand('vcf/{dataset}.child.chr{chromosome}.unphased.vcf',
+			dataset = datasets,
 			chromosome = chromosomes)
 
 
