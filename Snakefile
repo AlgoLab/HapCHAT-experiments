@@ -162,10 +162,28 @@ rule calculate_coverage:
 		shell("samtools depth {input} | awk '{{sum+=$3}} END {{ print sum/{length} }}' > {output}")
 
 
+def downsampling_source(wildcards) :
+
+	chr = wildcards.chromosome
+	dest_cov = int(wildcards.coverage)
+
+	source_cov = 'all'
+	if chr == '1' :
+		if 2 < dest_cov < 60 :
+			source_cov = dest_cov + 5
+	elif chr == '21' :
+		if 2 < dest_cov < 50 :
+			source_cov = dest_cov + 5
+
+	filebody = '{}.pacbio.{}.chr{}.cov{}'.format(
+		wildcards.dataset, wildcards.individual, chr, source_cov)
+
+	return { 'bam'      : 'bam/{}.bam'.format(filebody),
+		 'coverage' : 'stats/bam/{}.coverage'.format(filebody) }
+
+
 rule downsample:
-	input:
-		bam='bam/' + dataset_pattern + '.covall.bam',
-		coverage='stats/bam/' + dataset_pattern + '.covall.coverage'
+	input: unpack(downsampling_source)
 	output: 
 		bam='bam/' + dataset_pattern + '.cov{coverage,([0-9]+)}.bam',
 		bai='bam/' + dataset_pattern + '.cov{coverage,([0-9]+)}.bai'
