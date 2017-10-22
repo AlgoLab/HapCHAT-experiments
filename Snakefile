@@ -310,26 +310,10 @@ rule new_genetic_map:
 
 ## Create the VCF file for the "virtual child"
 
-rule copy_sim_father_mother:
-	input: 'vcf/ashk.{individual,(mother|father)}.chr{chromosome,[0-9]+}.phased.vcf'
-	output: 'vcf/sim.{individual,(mother|father)}.chr{chromosome,[0-9]+}.phased.vcf'
+rule copy_sim_father_mother_child:
+	input: 'vcf/ashk.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.phased.vcf'
+	output: 'vcf/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.phased.vcf'
 	shell: 'ln -fsrv {input} {output}'
-
-
-rule create_artificial_child:
-	input:
-		mothervcf='vcf/sim.mother.chr{chromosome,[0-9]+}.phased.vcf',
-		fathervcf='vcf/sim.father.chr{chromosome,[0-9]+}.phased.vcf',
-		genetic_map='genmap/scaled-10/genetic_map_chr{chromosome,[0-9]+}.txt'
-	output:
-		childvcf='vcf/sim.child.chr{chromosome,[0-9]+}.phased.vcf',
-		motherrecomb='sim/mother.chr{chromosome,[0-9]+}.true.recomb',
-		fatherrecomb='sim/father.chr{chromosome,[0-9]+}.true.recomb'
-	log: 'vcf/sim.child.chr{chromosome,[0-9]+}.phased.vcf.log'
-	message: 'Sampling artifical child'
-	run: 
-		sample = role_to_sampleid['child']
-		shell('{artificial_child} {input.genetic_map} {input.mothervcf} {input.fathervcf} {sample} {output.motherrecomb} {output.fatherrecomb} > {output.childvcf} 2>{log}')
 
 
 rule merge_artificial_trio:
