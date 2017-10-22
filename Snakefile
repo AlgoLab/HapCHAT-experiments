@@ -65,6 +65,10 @@ rule input_only :
 
 		expand('vcf/{dataset}.child.chr{chromosome}.unphased.vcf',
 			dataset = datasets,
+			chromosome = chromosomes),
+
+		expand('stats/bam/{dataset}.pacbio.child.chr{chromosome}.covall.avgrlen',
+			dataset = datasets,
 			chromosome = chromosomes)
 
 
@@ -172,6 +176,17 @@ rule calculate_coverage:
 				length = e['LN']
 		assert length != None
 		shell("samtools depth {input} | awk '{{sum+=$3}} END {{ print sum/{length} }}' > {output}")
+
+
+rule calculate_avg_read_length :
+	input : 'bam/' + dataset_pattern + '.cov{coverage}.bam'
+	output : 'stats/bam/' + dataset_pattern + '.cov{coverage,(all|[0-9]+)}.avgrlen'
+	message : 'computing average mapped read length from {input}'
+	shell : '''
+
+   samtools view {input} | \
+      awk '{{ sum += length($10) ; n += 1 }} END {{ print sum/n }}' \
+         > {output} '''
 
 
 def downsampling_source(wildcards) :
