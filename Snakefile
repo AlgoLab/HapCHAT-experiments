@@ -6,8 +6,6 @@ ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/reference/GRCh38_referenc
 https://github.com/nanopore-wgs-consortium/NA12878
 
 PacBio : https://downloads.pacbcloud.com/public/dataset/na12878/
-
-Platinum VCF: ftp://platgene_ro@ussd-ftp.illumina.com/2016-1.0/hg38/small_variants/NA12878/NA12878.vcf.gz
  
 How to re-run this workflow
 ---------------------------
