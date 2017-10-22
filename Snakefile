@@ -24,6 +24,7 @@ if 'TMPDIR' in os.environ:
 
 datasets = ['ashk', 'sim']
 individuals = ['child']  #['mother', 'father', 'child']
+chromosomes = [1, 21]
 coverage = [2, 3, 4, 5, 10, 15, 'all']
 reference = 'reference/human_g1k_v37.fasta'
 role_to_sampleid = {'mother':'HG004', 'father':'HG003', 'child':'HG002' }
@@ -54,6 +55,13 @@ gatk_jar = 'restricted-software/GenomeAnalysisTK.jar'
 hapcompass = 'java -Xmx220g -jar .../hapcompass-0.8.1.jar'
 
 dataset_pattern = '{dataset,[a-z]+}.{platform,[a-z]+}.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}'
+
+
+rule input_only :
+	input :
+		expand('stats/bam/{dataset}.pacbio.child.chr{chromosome}.cov15.coverage',
+			dataset = datasets,
+			chromosome = chromosomes)
 
 
 rule master:
