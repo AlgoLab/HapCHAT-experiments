@@ -406,11 +406,10 @@ rule simulate_pacbio_reads:
 		haplotype='sim/sim.{individual}.chr{chromosome}.haplotype{hap}.true.fasta'
 	log: 'sim/sim.{individual,(mother|father|child)}.chr{chromosome,[0-9]+}.haplotype{hap,[12]}.fastq.log'
 	run:
-		coverage = 30
-		halfcoverage = coverage / 2
+		coverage = 60
 		seed = abs(hash(output.fastq))
 		shell('mkdir -p sim/tmp')
-		shell('time (pbsim --seed {seed} --prefix sim/tmp/sim.{wildcards.individual}.chr{wildcards.chromosome}.haplotype{wildcards.hap} --depth {halfcoverage} --sample-fastq {input.sample} {input.haplotype}) > {log} 2>&1')
+		shell('time (pbsim --seed {seed} --prefix sim/tmp/sim.{wildcards.individual}.chr{wildcards.chromosome}.haplotype{wildcards.hap} --depth {coverage} --sample-fastq {input.sample} {input.haplotype}) > {log} 2>&1')
 		shell('awk \'NR%4==1 {{printf("%s_HAP{wildcards.hap}\\n",$0)}} NR%4!=1 {{print}}\' sim/tmp/sim.{wildcards.individual}.chr{wildcards.chromosome}.haplotype{wildcards.hap}_0001.fastq | {gzip} > {output.fastq}')
 		shell('cat sim/tmp/sim.{wildcards.individual}.chr{wildcards.chromosome}.haplotype{wildcards.hap}_0001.maf | {gzip} > {output.maf}')
 		shell('rm -f sim/tmp/sim.{wildcards.individual}.chr{wildcards.chromosome}.haplotype{wildcards.hap}_*')
